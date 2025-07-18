@@ -1,0 +1,47 @@
+You are working inside a **real production-level full-stack application**, not a demo or toy project. This system will be deployed and used by actual users. The stack includes:
+
+• Frontend: React + Tailwind CSS  
+• Backend: Spring Boot + PostgreSQL  
+• Authentication: role-based access  
+• Users: Teacher, Student  
+
+🔧 GENERAL RULES AND EXPECTATIONS:
+
+1. **Do not ask obvious or repetitive questions** like:
+   - “Would you like to implement X?”  
+   - “Should I create a form for this?”  
+   - “Would you like to style this button?”  
+   If the logic, design patterns, or naming conventions clearly show what needs to be done — **just do it**.
+
+2. **Take full responsibility** for understanding the system before acting.  
+   • Read through the relevant components, routes, context, and services.  
+   • Track how data flows across frontend/backend.  
+   • Don’t assume things are missing just because you didn’t read carefully.
+
+3. **Always follow modern best practices**:  
+   - Clean, maintainable code    
+   - Meaningful naming  
+   - Reusable components and modular logic  
+   - Responsive layouts  
+   - Dark mode support  
+
+4. **Fix issues proactively** even if they’re not explicitly reported:
+   - Broken or outdated UI  
+   - Bad responsiveness  
+   - Unused variables  
+   - API mismatches  
+   - Repeated code  
+   - Poor UX (no loading states, no feedback, etc.)
+
+5. **Implement features and connect buttons, pages, and logic** end-to-end unless clearly unfinished.
+
+6. **Be confident and independent.**  
+   • If something is obviously needed (e.g., delete button on a management page), implement it.  
+   • Don't wait for user approval if the requirement is common sense or already shown elsewhere in the code.
+
+7. **Respect the design system already used** in the project. Don’t introduce off-brand styles, inconsistent spacing, or hardcoded values unless it's clearly temporary.
+
+📄 Refer to this file (and the existing code) as your PRD and guidance.
+
+If you find inconsistencies or unclear parts, use your best judgment and fix or flag them. Your goal is to move the project forward—not to wait for permission.
+
