@@ -3,9 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { apiFetch } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useDarkMode } from '../context/DarkModeContext';
-import { Star, Clock, BarChart3, BookOpen, Video, FileText, Download, ChevronLeft, CheckCircle, Lock } from 'lucide-react';
+import { Star, Clock, BarChart3, BookOpen, Video, FileText, Download, ChevronLeft, CheckCircle, Lock, Star as StarIcon } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import videojs from 'video.js';
+import 'video.js/dist/video-js.css';
 
 const CourseViewerPage = () => {
     const { courseId } = useParams();
@@ -20,6 +22,15 @@ const CourseViewerPage = () => {
     const [activeTab, setActiveTab] = useState('overview');
     const [isEnrolled, setIsEnrolled] = useState(false);
     const [enrolling, setEnrolling] = useState(false);
+    const [lectureProgress, setLectureProgress] = useState({}); // {lectureId: true}
+    const [currentLecture, setCurrentLecture] = useState(0);
+    const [paid, setPaid] = useState(false);
+    const [ratingSummary, setRatingSummary] = useState({ average: 0, count: 0, enrolled: 0 });
+    const [userRating, setUserRating] = useState(null);
+    const [ratingValue, setRatingValue] = useState(0);
+    const [ratingComment, setRatingComment] = useState('');
+    const [ratingLoading, setRatingLoading] = useState(false);
+    const isStudent = user && user.roles && user.roles.includes('STUDENT');
 
     useEffect(() => {
         const fetchCourseData = async () => {
@@ -37,16 +48,28 @@ const CourseViewerPage = () => {
                 console.log("Resources data received:", resourcesData);
                 setResources(resourcesData);
 
-                // Check if user is enrolled
+                // Check if user is enrolled and paid
                 if (user) {
-                    try {
-                        const enrollmentData = await apiFetch(`/enrollments/check/${courseId}`);
-                        console.log("Enrollment data:", enrollmentData);
+                    apiFetch(`/enrollments/check/${courseId}`).then(enrollmentData => {
                         setIsEnrolled(enrollmentData.enrolled);
-                    } catch (err) {
-                        console.error("Error checking enrollment:", err);
-                        setIsEnrolled(false);
-                    }
+                        if (!enrollmentData.enrolled) {
+                            navigate(`/payment/${courseId}`);
+                        } else {
+                            // Fetch enrollment to check paid status
+                            apiFetch('/enrollments/my-courses').then(enrollments => {
+                                const found = enrollments.find(e => e.course.id === Number(courseId));
+                                if (found && found.paid) {
+                                    setPaid(true);
+                                    // Optionally, load progress
+                                    setLectureProgress({}); // TODO: fetch real progress if available
+                                } else {
+                                    navigate(`/payment/${courseId}`);
+                                }
+                            });
+                        }
+                    }).catch(() => {
+                        navigate(`/login?next=/courses/${courseId}/resources`);
+                    });
                 }
             } catch (err) {
                 console.error("Error fetching course data:", err);
@@ -62,11 +85,43 @@ const CourseViewerPage = () => {
         } else {
             console.error("CourseViewerPage: courseId is undefined or null");
         }
-    }, [courseId, user]);
+    }, [courseId, user, navigate]);
+
+    // Fetch rating summary and user's rating
+    useEffect(() => {
+      if (courseId) {
+        apiFetch(`/courses/${courseId}/rating-summary`).then(setRatingSummary).catch(() => {});
+        if (isStudent) {
+          apiFetch(`/courses/${courseId}/ratings`).then(ratings => {
+            const mine = ratings.find(r => r.user && user && r.user.id === user.id);
+            if (mine) {
+              setUserRating(mine);
+              setRatingValue(mine.rating);
+              setRatingComment(mine.comment || '');
+            }
+          }).catch(() => {});
+        }
+      }
+    }, [courseId, user, isStudent]);
 
     const handleEnroll = () => {
         // Redirect to enrollment page
         navigate(`/enroll/${courseId}`);
+    };
+
+    const handleRatingSubmit = async (e) => {
+      e.preventDefault();
+      setRatingLoading(true);
+      try {
+        await apiFetch(`/courses/${courseId}/rate`, {
+          method: 'POST',
+          body: JSON.stringify({ rating: ratingValue, comment: ratingComment }),
+          headers: { 'Content-Type': 'application/json' },
+        });
+        setUserRating({ rating: ratingValue, comment: ratingComment });
+        setRatingSummary(s => ({ ...s, count: s.count + (userRating ? 0 : 1) }));
+      } catch {}
+      setRatingLoading(false);
     };
 
     const getFileIcon = (fileType) => {
@@ -74,6 +129,26 @@ const CourseViewerPage = () => {
         if (fileType.match(/pdf|doc|docx|txt/i)) return <FileText />;
         if (fileType.match(/mp4|mov|avi|webm|video/i)) return <Video />;
         return <FileText />;
+    };
+
+    // Video.js player ref
+    const videoRefs = React.useRef([]);
+
+    // Handle video end to unlock next lecture and save progress
+    const handleVideoEnd = (idx, resource) => {
+        // Unlock next lecture
+        setLectureProgress(prev => {
+            const updated = { ...prev, [resource.id]: true };
+            // Save progress to backend (progress = percent of lectures completed)
+            const unlockedCount = Object.keys(updated).length;
+            const percent = Math.round((unlockedCount / resources.length) * 100);
+            apiFetch(`/enrollments/course/${courseId}/progress`, {
+                method: 'POST',
+                body: JSON.stringify({ progress: percent }),
+                headers: { 'Content-Type': 'application/json' },
+            });
+            return updated;
+        });
     };
 
     if (loading) {
@@ -262,48 +337,92 @@ const CourseViewerPage = () => {
                                         <li>Intermediate learners wanting to deepen their knowledge</li>
                                         <li>Professionals seeking to update their skills</li>
                                     </ul>
+                                    <div className="mt-8">
+                                        <h3 className="text-lg font-bold mb-2">Course Rating</h3>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="font-bold text-lg text-[#2B2FAF]">{Number(ratingSummary.average).toFixed(1)}</span>
+                                            <div className="flex items-center">
+                                                {[...Array(5)].map((_, i) => (
+                                                    <StarIcon key={i} size={18} className={i < Math.round(ratingSummary.average) ? 'text-yellow-400 fill-current' : 'text-gray-300 dark:text-gray-600'} />
+                                                ))}
+                                            </div>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">({ratingSummary.count} ratings)</span>
+                                            <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">{ratingSummary.enrolled} enrolled</span>
+                                        </div>
+                                        {isStudent && isEnrolled && paid && (
+                                            <form onSubmit={handleRatingSubmit} className="mt-4 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    {[1,2,3,4,5].map(i => (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            onClick={() => setRatingValue(i)}
+                                                            className="focus:outline-none"
+                                                        >
+                                                            <StarIcon size={24} className={i <= ratingValue ? 'text-yellow-400 fill-current' : 'text-gray-300 dark:text-gray-600'} />
+                                                        </button>
+                                                    ))}
+                                                    <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">{userRating ? 'Update your rating' : 'Rate this course'}</span>
+                                                </div>
+                                                <textarea
+                                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 p-2 mb-2"
+                                                    rows={2}
+                                                    placeholder="Leave a comment (optional)"
+                                                    value={ratingComment}
+                                                    onChange={e => setRatingComment(e.target.value)}
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    disabled={ratingLoading || ratingValue === 0}
+                                                    className="px-4 py-2 rounded-lg bg-[#2B2FAF] text-white font-bold hover:bg-[#23268a] transition-colors disabled:opacity-50"
+                                                >
+                                                    {userRating ? 'Update Rating' : 'Submit Rating'}
+                                                </button>
+                                            </form>
+                                        )}
+                                        {userRating && (
+                                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                                Your rating: {[...Array(5)].map((_, i) => (
+                                                    <StarIcon key={i} size={16} className={i < userRating.rating ? 'text-yellow-400 fill-current' : 'text-gray-300 dark:text-gray-600'} />
+                                                ))}
+                                                {userRating.comment && <span className="ml-2 italic">"{userRating.comment}"</span>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
 
                             {activeTab === 'resources' && (
                                 <div>
-                                    <h2 className="text-2xl font-bold mb-4">Course Resources</h2>
-                                    {resources.length === 0 ? (
-                                        <p className="text-gray-500 dark:text-gray-400">No resources available for this course yet.</p>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {resources.map((resource) => (
-                                                <div
-                                                    key={resource.id}
-                                                    className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-                                                >
-                                                    <div className="flex items-center">
-                                                        <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg mr-4">
-                                                            {getFileIcon(resource.fileType)}
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="font-medium">{resource.fileName}</h3>
-                                                            <p className="text-sm text-gray-500 dark:text-gray-400">{resource.fileType}</p>
-                                                        </div>
+                                    <h2 className="text-xl font-bold mb-4">Course Lectures</h2>
+                                    {resources.length === 0 && <p>No resources found for this course.</p>}
+                                    <div className="space-y-8">
+                                        {resources.map((resource, idx) => {
+                                            const isLocked = idx > 0 && !lectureProgress[resources[idx - 1].id];
+                                            return (
+                                                <div key={resource.id} className={`rounded-lg p-4 shadow bg-white dark:bg-gray-800 border ${isLocked ? 'opacity-50 pointer-events-none' : ''}`}>
+                                                    <div className="flex items-center mb-2">
+                                                        <Video className="mr-2 text-indigo-500" />
+                                                        <span className="font-semibold text-lg">Lecture {idx + 1}: {resource.title || resource.fileName}</span>
+                                                        {isLocked && <Lock className="ml-2 text-gray-400" />}
                                                     </div>
-                                                    {isEnrolled ? (
-                                                        <a
-                                                            href={resource.fileUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
-                                                        >
-                                                            <Download size={18} className="mr-1" /> Download
-                                                        </a>
-                                                    ) : (
-                                                        <div className="flex items-center text-gray-400">
-                                                            <Lock size={18} className="mr-1" /> Enroll to access
-                                                        </div>
-                                                    )}
+                                                    <div>
+                                                        <video
+                                                            ref={el => videoRefs.current[idx] = el}
+                                                            className="video-js vjs-big-play-centered rounded-lg"
+                                                            controls
+                                                            preload="auto"
+                                                            width="100%"
+                                                            height="360"
+                                                            poster={resource.thumbnailUrl || ''}
+                                                            onEnded={() => handleVideoEnd(idx, resource)}
+                                                            src={resource.contentUrl}
+                                                        />
+                                                    </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>

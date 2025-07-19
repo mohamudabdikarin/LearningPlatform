@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { to: '/dashboard/teacher', label: 'Overview', icon: LayoutDashboard },
+  { to: '/dashboard/teacher', label: 'Dasboard', icon: LayoutDashboard },
   { to: '/dashboard/teacher/courses', label: 'My Courses', icon: BookOpen },
   { to: '/dashboard/teacher/resources', label: 'Resources', icon: Upload },
   { to: '/dashboard/teacher/enrollments', label: 'Students', icon: Users },
@@ -46,17 +46,18 @@ const TeacherDashboardLayout = () => {
 
         {/* Sidebar */}
         <aside
-          className={`fixed md:relative z-40 top-0 left-0 h-screen w-72 bg-white dark:bg-gray-800 shadow-xl border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out flex flex-col
+          className={`fixed md:top-0 z-40 top-0 left-0 h-screen w-72 bg-white dark:bg-gray-800 shadow-xl border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
+          style={{ minWidth: '18rem' }}
         >
           {/* Header */}
           <div className="flex items-center gap-3 px-6 py-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <div className="hidden md:flex w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Teacher Hub</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Dashboard</p>
+              <h1 className="ml-12 md:ml-0 text-xl font-bold text-gray-900 dark:text-white">Teacher Panel</h1>
+
             </div>
           </div>
 
@@ -114,7 +115,7 @@ const TeacherDashboardLayout = () => {
         )}
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto transition-all duration-300 md:ml-64" >
           <div className="p-6 md:p-8">
             <Outlet />
           </div>

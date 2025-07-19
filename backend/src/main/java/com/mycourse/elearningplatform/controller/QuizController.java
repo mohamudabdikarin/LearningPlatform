@@ -34,7 +34,7 @@ public class QuizController {
     }
 
     // Teacher: Create quiz and assign to course
-    @PreAuthorize("hasAuthority('TEACHER')")
+    @PreAuthorize("hasRole('TEACHER')")
     @PostMapping
     public ResponseEntity<Quiz> createQuiz(@RequestBody Quiz quiz, @RequestParam Long courseId) {
         Course course = courseRepository.findById(courseId).orElseThrow();
@@ -43,7 +43,7 @@ public class QuizController {
     }
 
     // Teacher: Update quiz
-    @PreAuthorize("hasAuthority('TEACHER')")
+    @PreAuthorize("hasRole('TEACHER')")
     @PutMapping("/{id}")
     public ResponseEntity<Quiz> updateQuiz(@PathVariable Long id, @RequestBody Quiz updated) {
         return quizRepository.findById(id).map(quiz -> {
@@ -55,7 +55,7 @@ public class QuizController {
     }
 
     // Teacher: Delete quiz
-    @PreAuthorize("hasAuthority('TEACHER')")
+    @PreAuthorize("hasRole('TEACHER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteQuiz(@PathVariable Long id) {
         quizRepository.deleteById(id);

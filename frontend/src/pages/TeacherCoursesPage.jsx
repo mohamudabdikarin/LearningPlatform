@@ -5,7 +5,7 @@ import { useDarkMode } from '../context/DarkModeContext';
 import { Star, Clock, BarChart3 } from 'lucide-react';
 import { Pencil, Trash2 } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
-const emptyCourse = { title: '', description: '', price: '', imageUrl: '', videoUrl: '' };
+const emptyCourse = { title: '', description: '', price: '', imageUrl: '', videoUrl: '', discountPrice: '', discountActive: false };
 
 const extractDriveFileId = (urlOrId) => {
     if (!urlOrId) return '';
@@ -110,10 +110,10 @@ const TeacherCoursesPage = () => {
             let res;
             try {
                 res = await apiFetch('/upload', {
-                method: 'POST',
-                body: formData,
-                headers: {},
-            });
+                    method: 'POST',
+                    body: formData,
+                    headers: {},
+                });
             } catch (err) {
                 // If backend returns non-JSON error, show generic error
                 setImgError(err.message || 'Image upload failed.');
@@ -168,15 +168,48 @@ const TeacherCoursesPage = () => {
     };
 
     const validateForm = () => {
-        if (!form.title.trim() || !form.description.trim() || !form.price || isNaN(form.price)) return false;
-        return true;
+        const errors = [];
+
+        if (!form.title.trim()) {
+            errors.push('Title is required');
+        }
+
+        if (!form.description.trim()) {
+            errors.push('Description is required');
+        }
+
+        if (!form.price) {
+            errors.push('Price is required');
+        } else if (isNaN(form.price) || Number(form.price) < 0) {
+            errors.push('Price must be a valid positive number');
+        }
+
+        if (form.discountActive) {
+            if (!form.discountPrice) {
+                errors.push('Discount price is required when discount is enabled');
+            } else if (isNaN(form.discountPrice) || Number(form.discountPrice) < 0) {
+                errors.push('Discount price must be a valid positive number');
+            } else if (Number(form.discountPrice) >= Number(form.price)) {
+                errors.push('Discount price must be less than the regular price');
+            }
+        }
+
+        return errors;
     };
 
     const handleSubmit = async e => {
         e.preventDefault();
         setError(''); setSuccess('');
-        if (!validateForm()) {
-            setError('Please fill in all required fields correctly.');
+
+        const validationErrors = validateForm();
+        if (validationErrors.length > 0) {
+            setError(
+                <ul className="list-disc pl-5">
+                    {validationErrors.map((err, index) => (
+                        <li key={index}>{err}</li>
+                    ))}
+                </ul>
+            );
             return;
         }
         try {
@@ -199,6 +232,19 @@ const TeacherCoursesPage = () => {
             setEditId(null);
             setForm(emptyCourse);
             setShowForm(false);
+
+            if (form.discountActive && form.discountPrice) {
+                await apiFetch(`/courses/${createdOrUpdated.id}/discount`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ discountPrice: form.discountPrice, discountActive: true }),
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            } else {
+                await apiFetch(`/courses/${createdOrUpdated.id}/discount`, {
+                    method: 'DELETE',
+                });
+            }
+
         } catch (e) {
             setError(e.message || 'Failed to save course.');
         }
@@ -214,7 +260,11 @@ const TeacherCoursesPage = () => {
     };
 
     if (!user) return <div className="p-8 text-center">Login required.</div>;
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+    );
     if (error) return <div className="p-8 text-center text-red-500">{error}</div>;
 
     return (
@@ -255,56 +305,228 @@ const TeacherCoursesPage = () => {
                 {/* Modal for Create/Edit Course */}
                 {showForm && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-                        <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 relative animate-fade-in max-h-[90vh] overflow-y-auto focus:outline-none">
-                            <button className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setError(''); setSuccess(''); setImgError(''); }} aria-label="Close">&times;</button>
-                            <h2 className="text-2xl font-bold text-center mb-2 text-gray-900 dark:text-white">{editId ? 'Edit Course' : 'Create a New Course'}</h2>
-                            <p className="text-center text-gray-600 dark:text-gray-400 mb-6 text-base">Enter course details below.</p>
-                            {success && <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg relative mb-4 text-sm" role="alert">{success}</div>}
-                            {error && <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative mb-4 text-sm" role="alert">{error}</div>}
-                            <form onSubmit={handleSubmit} className="space-y-2">
-                                <div>
-                                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1">Title <span className="text-red-500">*</span></label>
-                                    <input name="title" value={form.title} onChange={handleChange} className="w-full pl-3 pr-3 py-1.5 rounded-lg border transition-all duration-300 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 border-gray-300 dark:border-gray-600 text-base" required />
-                                </div>
-                                <div>
-                                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1">Description <span className="text-red-500">*</span></label>
-                                    <textarea name="description" value={form.description} onChange={handleChange} className="w-full pl-3 pr-3 py-1.5 rounded-lg border transition-all duration-300 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 border-gray-300 dark:border-gray-600 text-base" required />
-                                </div>
-                                <div>
-                                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1">Price (USD) <span className="text-red-500">*</span></label>
-                                    <input name="price" type="number" min="0" step="0.01" value={form.price} onChange={handleChange} className="w-full pl-3 pr-3 py-1.5 rounded-lg border transition-all duration-300 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 border-gray-300 dark:border-gray-600 text-base" required />
-                                </div>
-                                <div>
-                                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-1">Course Image</label>
-                                    <div className="flex items-center gap-4">
-                                        <input
-                                            id="course-image-input"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleImageUpload}
-                                            className="hidden"
-                                            disabled={imgUploading}
-                                        />
-                                        <label
-                                            htmlFor="course-image-input"
-                                            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 rounded-lg cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600 transition border border-gray-300 dark:border-gray-600 shadow-sm text-base"
-                                        >
-                                            {imgUploading ? (
-                                                <span className="flex items-center gap-2"><svg className="animate-spin h-5 w-5 text-blue-600" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Uploading...</span>
-                                            ) : 'Choose Image'}
-                                        </label>
-                                        {selectedFileName && !imgUploading && (
-                                            <span className="text-base text-gray-600 dark:text-gray-300">{selectedFileName}</span>
-                                        )}
-                                        {form.imageUrl && <img src={form.imageUrl} alt="Course" className="w-16 h-16 object-cover rounded-lg" />}
+                        <div
+                            ref={modalRef}
+                            tabIndex={-1}
+                            role="dialog"
+                            aria-modal="true"
+                            className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-y-auto w-full max-w-2xl mx-auto p-4 sm:p-6 focus:outline-none "
+                        >
+                            <button
+                                className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl"
+                                onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setError(''); setSuccess(''); setImgError(''); }}
+                                aria-label="Close"
+                            >
+                                &times;
+                            </button>
+                            <h2 className="text-xl sm:text-2xl font-bold text-center mb-2 text-gray-900 dark:text-white">
+                                {editId ? 'Edit Course' : 'Create a New Course'}
+                            </h2>
+                            <p className="text-center text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base">
+                                Enter course details below.
+                            </p>
+
+                            {success && (
+                                <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg relative mb-4 text-sm" role="alert">
+                                    <div className="flex items-start">
+                                        <div className="flex-shrink-0 mt-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div className="ml-3">
+                                            <p className="text-sm font-medium text-green-700 dark:text-green-300">{success}</p>
+                                        </div>
                                     </div>
-                                    {imgError && <div className="text-red-500 text-sm mt-1">{imgError}</div>}
                                 </div>
-                                <div className="flex pt-2 space-x-4">
-                                    <button type="submit" disabled={imgUploading} className="w-full py-2 px-2 border border-transparent  rounded-lg shadow-sm text-base font-bold text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300">
+                            )}
+                            {error && (
+                                <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative mb-4 text-sm" role="alert">
+                                    <div className="flex items-start">
+                                        <div className="flex-shrink-0 mt-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                            </svg>
+                                        </div>
+                                        <div className="ml-3">
+                                            <h3 className="text-sm font-medium text-red-700 dark:text-red-300">Please correct the following errors:</h3>
+                                            <div className="mt-1">
+                                                {error}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSubmit} className="space-y-5">
+                                {/* Mobile-first vertical layout, desktop horizontal */}
+                                <div className="space-y-5 md:space-y-0 md:grid md:grid-cols-2 md:gap-8">
+                                    {/* Left Column - Basic Info */}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                Course Title <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                id="title"
+                                                name="title"
+                                                value={form.title}
+                                                onChange={handleChange}
+                                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm"
+                                                required
+                                                placeholder="e.g., Complete Web Development Bootcamp"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label htmlFor="description" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                Description <span className="text-red-500">*</span>
+                                            </label>
+                                            <textarea
+                                                id="description"
+                                                name="description"
+                                                value={form.description}
+                                                onChange={handleChange}
+                                                rows="4"
+                                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm resize-none"
+                                                required
+                                                placeholder="Describe what students will learn in this course..."
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label htmlFor="price" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                Price (USD) <span className="text-red-500">*</span>
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">$</span>
+                                                <input
+                                                    id="price"
+                                                    name="price"
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={form.price}
+                                                    onChange={handleChange}
+                                                    className="w-full pl-8 pr-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm"
+                                                    required
+                                                    placeholder="99.00"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column - Media & Pricing */}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                Course Image
+                                            </label>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        id="course-image-input"
+                                                        type="file"
+                                                        accept="image/*"
+                                                        onChange={handleImageUpload}
+                                                        className="hidden"
+                                                        disabled={imgUploading}
+                                                    />
+                                                    <label
+                                                        htmlFor="course-image-input"
+                                                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 text-sm font-medium"
+                                                    >
+                                                        {imgUploading ? (
+                                                            <>
+                                                                <svg className="animate-spin h-4 w-4 text-indigo-600" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                                                </svg>
+                                                                Uploading...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                </svg>
+                                                                Choose Image
+                                                            </>
+                                                        )}
+                                                    </label>
+                                                    {selectedFileName && !imgUploading && (
+                                                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px] md:max-w-[150px]">
+                                                            {selectedFileName}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {imgError && <p className="text-red-500 text-xs">{imgError}</p>}
+                                                {form.imageUrl && (
+                                                    <div className="relative">
+                                                        <img
+                                                            src={form.imageUrl}
+                                                            alt="Course preview"
+                                                            className="w-full h-32 sm:h-28 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                                Discount Pricing
+                                            </label>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        id="discount-active"
+                                                        checked={form.discountActive}
+                                                        onChange={(e) => setForm((f) => ({ ...f, discountActive: e.target.checked }))}
+                                                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
+                                                    />
+                                                    <label htmlFor="discount-active" className="text-sm text-gray-700 dark:text-gray-300">
+                                                        Enable discount pricing
+                                                    </label>
+                                                </div>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">$</span>
+                                                    <input
+                                                        name="discountPrice"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={form.discountPrice}
+                                                        onChange={handleChange}
+                                                        className={`w-full pl-8 pr-3 py-2.5 rounded-lg border transition-colors text-sm
+                                                        ${!form.discountActive
+                                                                ? 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                                                : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600'} 
+                                                        placeholder-gray-400 dark:placeholder-gray-500`}
+                                                        placeholder="49.00"
+                                                        disabled={!form.discountActive}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex flex-col sm:flex-row gap-3 sm:space-x-4">
+                                    <button
+                                        type="submit"
+                                        disabled={imgUploading}
+                                        className="w-full sm:w-auto py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                                    >
                                         {editId ? 'Update Course' : 'Create Course'}
                                     </button>
-                                    <button type="button" className="w-full py-2 px-3 border border-transparent rounded-lg shadow-sm  text-base font-bold text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 dark:focus:ring-offset-gray-800 transition-all duration-300" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setError(''); setSuccess(''); setImgError(''); }}>Cancel</button>
+                                    <button
+                                        type="button"
+                                        className="w-full sm:w-auto py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-indigo-600 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 dark:focus:ring-offset-gray-800 transition-all duration-300"
+                                        onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setError(''); setSuccess(''); setImgError(''); }}
+                                    >
+                                        Cancel
+                                    </button>
                                 </div>
                             </form>
                         </div>

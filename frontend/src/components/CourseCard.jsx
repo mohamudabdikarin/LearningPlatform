@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { apiFetch } from '../services/apiService';
 
 function formatPrice(price) {
     return Number(price).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -8,15 +10,35 @@ function formatPrice(price) {
 
 const CourseCard = ({ course, onEdit, onDelete }) => {
     const navigate = useNavigate();
+    const { user, isAuthenticated } = useAuth();
     const BACKEND_URL = "http://localhost:8080"; // or from .env
-    // Placeholder/mock data for instructor, rating, reviewCount, oldPrice, bestseller
     const instructor = course.instructor?.firstName && course.instructor?.lastName 
         ? `${course.instructor.firstName} ${course.instructor.lastName}` 
         : course.instructorName || "Instructor";
-    const rating = course.rating || 4.8;
-    const reviewCount = course.reviewCount || Math.floor(Math.random() * 2000) + 100;
-    const oldPrice = course.oldPrice || (course.price ? (Number(course.price) * 1.5).toFixed(2) : "");
-    const isBestseller = course.isBestseller || Math.random() > 0.7;
+
+    // Real rating and enrolled count
+    const [ratingSummary, setRatingSummary] = useState({ average: 0, count: 0, enrolled: 0 });
+    useEffect(() => {
+        apiFetch(`/courses/${course.id}/rating-summary`).then(setRatingSummary).catch(() => {});
+    }, [course.id]);
+
+    // Helper: is student
+    const isStudent = user && user.roles && user.roles.includes('STUDENT');
+
+    const handleEnroll = () => {
+        if (!isAuthenticated) {
+            navigate(`/login?next=/payment/${course.id}`);
+            return;
+        }
+        if (isStudent) {
+            navigate(`/payment/${course.id}`);
+        }
+    };
+
+    // Discount logic
+    const showDiscount = course.discountActive && course.discountPrice && Number(course.discountPrice) < Number(course.price);
+    const displayPrice = showDiscount ? course.discountPrice : course.price;
+    const oldPrice = showDiscount ? course.price : '';
     
     return (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col w-full overflow-hidden border border-gray-100 dark:border-gray-700">
@@ -45,13 +67,7 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
                         </div>
                     </div>
                 </div>
-                {isBestseller && (
-                    <span className="absolute top-3 right-3 bg-indigo-600 text-white text-xs font-semibold px-3 py-1 rounded-full uppercase shadow-lg">
-                        Bestseller
-                    </span>
-                )}
             </div>
-            
             {/* Content */}
             <div className="flex-1 flex flex-col p-5">
                 <div className="flex-1">
@@ -64,18 +80,17 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
                         {course.description}
                     </p>
-                    
                     {/* Rating */}
                     <div className="flex items-center gap-1 mb-3">
                         <span className="font-bold text-sm text-gray-900 dark:text-white">
-                            {rating.toFixed(1)}
+                            {Number(ratingSummary.average).toFixed(1)}
                         </span>
                         <div className="flex items-center">
                             {[...Array(5)].map((_, i) => (
                                 <Star 
                                     key={i} 
                                     size={14} 
-                                    className={i < Math.round(rating) 
+                                    className={i < Math.round(ratingSummary.average)
                                         ? "text-yellow-400 fill-current" 
                                         : "text-gray-300 dark:text-gray-600"
                                     } 
@@ -83,45 +98,53 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
                             ))}
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                            ({reviewCount.toLocaleString()})
+                            ({ratingSummary.count})
+                        </span>
+                        <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                            {ratingSummary.enrolled} enrolled
                         </span>
                     </div>
                 </div>
-                
                 {/* Price */}
                 <div className="flex items-center gap-2 mb-4">
                     <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {formatPrice(course.price)}
+                        {formatPrice(displayPrice)}
                     </span>
-                    {oldPrice && Number(oldPrice) > Number(course.price) && (
+                    {showDiscount && (
                         <span className="text-sm text-gray-400 line-through">
                             {formatPrice(oldPrice)}
                         </span>
                     )}
                 </div>
-                
                 {/* Actions */}
                 {onEdit && onDelete ? (
                     <div className="flex gap-2">
                         <button 
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors text-sm" 
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors text-sm"
                             onClick={onEdit} 
                             aria-label="Edit Course"
                         >
-                            <Pencil size={14} /> Edit
+                            <Pencil size={16} /> Edit
                         </button>
                         <button 
-                            className="flex items-center justify-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 bg-transparent border border-red-300 dark:border-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm" 
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors text-sm"
                             onClick={onDelete} 
                             aria-label="Delete Course"
                         >
-                            <Trash2 size={14} />
+                            <Trash2 size={16} /> Delete
                         </button>
                     </div>
                 ) : (
+                    isStudent ? (
+                        <button
+                            onClick={handleEnroll}
+                            className="px-5 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                            Enroll
+                        </button>
+                ) : (
                     <button 
                         onClick={() => {
-                            // Check if we're on a public page or student dashboard
                             const path = window.location.pathname;
                             if (path.includes('/dashboard/student')) {
                                 navigate(`/dashboard/student/course/${course.id}`);
@@ -131,10 +154,11 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
                                 navigate(`/courses/${course.id}`);
                             }
                         }}
-                        className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+                            className="w-full px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors text-sm"
                     >
                         View Details
                     </button>
+                    )
                 )}
             </div>
         </div>

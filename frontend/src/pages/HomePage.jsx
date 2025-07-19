@@ -85,19 +85,19 @@ const HomePage = () => {
                     <h2 className="text-3xl font-semibold text-center mb-8 text-gray-900 dark:text-white">How It Works</h2>
                     <div className="flex flex-col md:flex-row justify-center items-center gap-8 max-w-4xl mx-auto">
                         <div className="flex flex-col items-center">
-                            <div className="bg-indigo-100 dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-indigo-600 dark:text-indigo-300">1</div>
+                            <div className="bg-[#E6E8FA] dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-[#2B2FAF] dark:text-[#A5A8F5]">1</div>
                             <p className="font-medium text-gray-800 dark:text-gray-200">Sign Up as Student or Teacher</p>
                         </div>
                         <div className="flex flex-col items-center">
-                            <div className="bg-indigo-100 dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-indigo-600 dark:text-indigo-300">2</div>
+                            <div className="bg-[#E6E8FA] dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-[#2B2FAF] dark:text-[#A5A8F5]">2</div>
                             <p className="font-medium text-gray-800 dark:text-gray-200">Browse or Create Courses</p>
                         </div>
                         <div className="flex flex-col items-center">
-                            <div className="bg-indigo-100 dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-indigo-600 dark:text-indigo-300">3</div>
+                            <div className="bg-[#E6E8FA] dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-[#2B2FAF] dark:text-[#A5A8F5]">3</div>
                             <p className="font-medium text-gray-800 dark:text-gray-200">Enroll, Learn, and Track Progress</p>
                         </div>
                         <div className="flex flex-col items-center">
-                            <div className="bg-indigo-100 dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-indigo-600 dark:text-indigo-300">4</div>
+                            <div className="bg-[#E6E8FA] dark:bg-gray-700 rounded-full w-16 h-16 flex items-center justify-center mb-2 text-2xl font-bold text-[#2B2FAF] dark:text-[#A5A8F5]">4</div>
                             <p className="font-medium text-gray-800 dark:text-gray-200">Share Resources & Assessments</p>
                         </div>
                     </div>

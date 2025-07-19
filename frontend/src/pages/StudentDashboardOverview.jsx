@@ -3,10 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import { useDarkMode } from '../context/DarkModeContext';
 import { apiFetch } from '../services/apiService';
 import { BookOpen, Clock, Award, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const StudentDashboardOverview = () => {
   const { user } = useAuth();
   const { darkMode } = useDarkMode();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     enrolledCourses: 0,
     completedCourses: 0,
@@ -148,7 +150,10 @@ const StudentDashboardOverview = () => {
                       ></div>
                     </div>
                   </div>
-                  <button className="ml-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                  <button 
+                    className="ml-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    onClick={() => navigate(`/courses/${enrollment.course.id}/resources`)}
+                  >
                     Continue
                   </button>
                 </div>

@@ -24,6 +24,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.springframework.web.client.RestTemplate;
+import com.mycourse.elearningplatform.model.CourseRating;
+import com.mycourse.elearningplatform.repository.CourseRatingRepository;
+import java.math.BigDecimal;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -40,18 +44,57 @@ public class CourseController {
     private String supabaseServiceKey;
     @Autowired
     private RestTemplate restTemplate;
+    @Autowired
+    private CourseRatingRepository courseRatingRepository;
 
     // Public: List all courses
     @GetMapping
-    public List<Course> getAllCourses() {
-        return courseService.getAllCourses();
+    public ResponseEntity<?> getAllCourses() {
+        var courses = courseService.getAllCourses();
+        var courseData = courses.stream().map(course -> Map.of(
+            "id", course.getId(),
+            "title", course.getTitle(),
+            "description", course.getDescription(),
+            "price", course.getPrice(),
+            "imageUrl", course.getImageUrl(),
+            "videoUrl", course.getVideoUrl(),
+            "discountPrice", course.getDiscountPrice(),
+            "discountActive", course.isDiscountActive(),
+            "duration", course.getDuration(),
+            "instructor", Map.of(
+                "id", course.getInstructor().getId(),
+                "firstName", course.getInstructor().getFirstName(),
+                "lastName", course.getInstructor().getLastName(),
+                "email", course.getInstructor().getEmail()
+            )
+        )).toList();
+        return ResponseEntity.ok(courseData);
     }
 
     // Public: Get course by ID
     @GetMapping("/{id}")
-    public ResponseEntity<Course> getCourse(@PathVariable Long id) {
+    public ResponseEntity<?> getCourse(@PathVariable Long id) {
         return courseService.getCourseById(id)
-                .map(ResponseEntity::ok)
+                .map(course -> {
+                    Map<String, Object> courseData = Map.of(
+                        "id", course.getId(),
+                        "title", course.getTitle(),
+                        "description", course.getDescription(),
+                        "price", course.getPrice(),
+                        "imageUrl", course.getImageUrl(),
+                        "videoUrl", course.getVideoUrl(),
+                        "discountPrice", course.getDiscountPrice(),
+                        "discountActive", course.isDiscountActive(),
+                        "duration", course.getDuration(),
+                        "instructor", Map.of(
+                            "id", course.getInstructor().getId(),
+                            "firstName", course.getInstructor().getFirstName(),
+                            "lastName", course.getInstructor().getLastName(),
+                            "email", course.getInstructor().getEmail()
+                        )
+                    );
+                    return ResponseEntity.ok(courseData);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -173,5 +216,94 @@ public class CourseController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Supabase error: " + e.getMessage()));
         }
+    }
+
+    // Teacher: Set or update course discount
+    @PreAuthorize("hasRole('TEACHER')")
+    @PutMapping("/{id}/discount")
+    public ResponseEntity<?> setDiscount(@PathVariable Long id, @RequestBody Map<String, Object> body, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+        Course course = courseService.getCourseById(id).orElseThrow();
+        User instructor = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        if (!course.getInstructor().getId().equals(instructor.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: You can only update your own courses"));
+        }
+        BigDecimal discountPrice = body.get("discountPrice") != null ? new BigDecimal(body.get("discountPrice").toString()) : null;
+        boolean discountActive = Boolean.TRUE.equals(body.get("discountActive"));
+        course.setDiscountPrice(discountPrice);
+        course.setDiscountActive(discountActive && discountPrice != null && discountPrice.compareTo(BigDecimal.ZERO) > 0);
+        courseService.createCourse(course);
+        return ResponseEntity.ok(course);
+    }
+
+    // Teacher: Remove course discount
+    @PreAuthorize("hasRole('TEACHER')")
+    @DeleteMapping("/{id}/discount")
+    public ResponseEntity<?> removeDiscount(@PathVariable Long id, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+        Course course = courseService.getCourseById(id).orElseThrow();
+        User instructor = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        if (!course.getInstructor().getId().equals(instructor.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: You can only update your own courses"));
+        }
+        course.setDiscountPrice(null);
+        course.setDiscountActive(false);
+        courseService.createCourse(course);
+        return ResponseEntity.ok(course);
+    }
+
+    // Student: Rate a course
+    @PreAuthorize("hasRole('STUDENT')")
+    @PostMapping("/{id}/rate")
+    public ResponseEntity<?> rateCourse(@PathVariable Long id, @RequestBody Map<String, Object> body, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+        Course course = courseService.getCourseById(id).orElseThrow();
+        User student = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+        int rating = (int) body.getOrDefault("rating", 0);
+        String comment = (String) body.getOrDefault("comment", "");
+        if (rating < 1 || rating > 5) return ResponseEntity.badRequest().body(Map.of("error", "Rating must be 1-5"));
+        Optional<CourseRating> existing = courseRatingRepository.findByCourseAndUser(course, student);
+        CourseRating cr = existing.orElseGet(() -> {
+            CourseRating r = new CourseRating();
+            r.setCourse(course);
+            r.setUser(student);
+            return r;
+        });
+        cr.setRating(rating);
+        cr.setComment(comment);
+        cr.setCreatedAt(java.time.LocalDateTime.now());
+        courseRatingRepository.save(cr);
+        return ResponseEntity.ok(cr);
+    }
+
+    // Public: Get all ratings for a course
+    @GetMapping("/{id}/ratings")
+    public ResponseEntity<?> getCourseRatings(@PathVariable Long id) {
+        Course course = courseService.getCourseById(id).orElseThrow();
+        var ratings = courseRatingRepository.findByCourse(course);
+        var ratingData = ratings.stream().map(rating -> Map.of(
+            "id", rating.getId(),
+            "rating", rating.getRating(),
+            "comment", rating.getComment() != null ? rating.getComment() : "",
+            "createdAt", rating.getCreatedAt(),
+            "user", Map.of(
+                "id", rating.getUser().getId(),
+                "firstName", rating.getUser().getFirstName(),
+                "lastName", rating.getUser().getLastName()
+            )
+        )).toList();
+        return ResponseEntity.ok(ratingData);
+    }
+
+    // Public: Get course rating summary (average, count, enrollment count)
+    @GetMapping("/{id}/rating-summary")
+    public ResponseEntity<?> getCourseRatingSummary(@PathVariable Long id) {
+        Course course = courseService.getCourseById(id).orElseThrow();
+        var ratings = courseRatingRepository.findByCourse(course);
+        double avg = ratings.stream().mapToInt(CourseRating::getRating).average().orElse(0.0);
+        int count = ratings.size();
+        long enrolled = course.getId() != null ? course.getEnrollments() != null ? course.getEnrollments().size() : 0 : 0;
+        return ResponseEntity.ok(Map.of(
+            "average", avg,
+            "count", count,
+            "enrolled", enrolled
+        ));
     }
 } 

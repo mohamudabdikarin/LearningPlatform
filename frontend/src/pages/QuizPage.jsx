@@ -48,17 +48,17 @@ const QuizPage = ({ courseId }) => {
                 <form onSubmit={handleCreate} className="space-y-4 mb-8">
                     <div>
                         <label className="block mb-1">Title</label>
-                        <input name="title" value={form.title} onChange={handleChange} className="w-full px-3 py-2 rounded border" required />
+                        <input name="title" value={form.title} onChange={handleChange} className="w-full px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600" required />
                     </div>
                     <div>
                         <label className="block mb-1">Description</label>
-                        <textarea name="description" value={form.description} onChange={handleChange} className="w-full px-3 py-2 rounded border" required />
+                        <textarea name="description" value={form.description} onChange={handleChange} className="w-full px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600" required />
                     </div>
                     <div>
                         <label className="block mb-1">Total Points</label>
-                        <input name="totalPoints" type="number" value={form.totalPoints} onChange={handleChange} className="w-full px-3 py-2 rounded border" required />
+                        <input name="totalPoints" type="number" value={form.totalPoints} onChange={handleChange} className="w-full px-3 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600" required />
                     </div>
-                    <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded hover:bg-sky-700">Create Quiz</button>
+                    <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Create Quiz</button>
                 </form>
             )}
             <h3 className="text-lg font-bold mb-2">Quizzes</h3>
@@ -72,7 +72,7 @@ const QuizPage = ({ courseId }) => {
                             <div className="text-sm text-gray-500">Total Points: {quiz.totalPoints}</div>
                         </div>
                         {user && user.roles && user.roles.includes('STUDENT') && (
-                            <button className="px-3 py-1 bg-sky-600 text-white rounded mt-2 md:mt-0">Take Quiz</button>
+                            <button className="px-3 py-1 bg-indigo-600 text-white rounded mt-2 md:mt-0">Take Quiz</button>
                         )}
                     </div>
                 ))}

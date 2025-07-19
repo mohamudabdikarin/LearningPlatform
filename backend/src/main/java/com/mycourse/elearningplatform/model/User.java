@@ -42,6 +42,26 @@ public class User {
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new HashSet<>();
 
+    // Profile fields
+    private String phone;
+    private String address;
+    private String bio;
+    private String birthDate;
+    
+    @ElementCollection
+    @CollectionTable(name = "user_interests", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "interest")
+    private Set<String> interests = new HashSet<>();
+
+    // Password reset fields
+    private String resetToken;
+    private java.time.LocalDateTime resetTokenExpiry;
+
+    // Email verification fields
+    private String verificationCode;
+    private java.time.LocalDateTime verificationCodeExpiry;
+    private boolean emailVerified = false;
+
     public User(String firstName, String lastName, String email, String password) {
         this.firstName = firstName;
         this.lastName = lastName;

@@ -35,6 +35,9 @@ public class Enrollment {
     // Average quiz score for this enrollment
     private Integer averageQuizScore;
 
+    // Payment status
+    private boolean paid = false;
+
     public Enrollment(User user, Course course) {
         this.user = user;
         this.course = course;

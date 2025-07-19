@@ -7,6 +7,9 @@ import DashboardPage from './pages/DashboardPage';
 // import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import EmailVerificationPage from './pages/EmailVerificationPage';
 import ProfilePage from './pages/ProfilePage';
 import TeacherCoursesPage from './pages/TeacherCoursesPage';
 import EnrolledCoursesPage from './pages/EnrolledCoursesPage';
@@ -29,13 +32,16 @@ function App() {
   return (
     <Router>
       <div className="bg-light-gray min-h-screen">
-       
+
         <main>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<EmailVerificationPage />} />
             <Route path="/courses" element={<CoursesListPage />} />
             <Route path="/courses/:courseId" element={<CourseViewerPage />} />
             <Route path="/profile" element={<ProfilePage />} />
@@ -43,8 +49,9 @@ function App() {
             <Route path="/enrollments" element={<EnrolledCoursesPage />} />
             <Route path="/enroll/:courseId" element={<EnrollPage />} />
             <Route path="/payment/:courseId" element={<PaymentPage />} />
-            <Route path="/quizzes/:courseId" element={<QuizPageWrapper />} />
-            {/* <Route path="/courses-page" element={<CoursesPage />} /> */}
+
+
+        
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
@@ -62,6 +69,7 @@ function App() {
                 <Route index element={<StudentDashboardOverview />} />
                 <Route path="courses" element={<StudentCoursesPage />} />
                 <Route path="course/:courseId" element={<CourseViewerPage />} />
+                <Route path="course/:courseId/resources" element={<CourseViewerPage />} />
                 <Route path="progress" element={<StudentProgressPage />} />
                 <Route path="profile" element={<StudentProfilePage />} />
               </Route>
@@ -72,11 +80,6 @@ function App() {
       </div>
     </Router>
   );
-}
-
-function QuizPageWrapper() {
-  const { courseId } = require('react-router-dom').useParams();
-  return <QuizPage courseId={courseId} />;
 }
 
 export default App;

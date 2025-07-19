@@ -44,12 +44,12 @@ const StudentDashboardLayout = () => {
 
         {/* Sidebar */}
         <aside
-          className={`fixed md:relative z-40 top-0 left-0 h-screen w-72 bg-white dark:bg-gray-800 shadow-xl border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out flex flex-col
+          className={`fixed z-40 top-0 left-0 h-screen w-72 bg-white dark:bg-gray-800 shadow-xl border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
         >
           {/* Header */}
           <div className="flex items-center gap-3 px-6 py-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center hidden md:flex">
               <BookOpen className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -112,7 +112,7 @@ const StudentDashboardLayout = () => {
         )}
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto transition-all duration-300 md:ml-72">
           <div className="p-6 md:p-8">
             <Outlet />
           </div>
