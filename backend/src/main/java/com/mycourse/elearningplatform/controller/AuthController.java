@@ -73,7 +73,7 @@ public class AuthController {
                 return ResponseEntity.status(401).body(Map.of("error", "Please verify your email.", "field", "email", "requiresVerification", true));
             }
 
-            // Generate JWT token
+            // Generate JWT token (
             String jwt = jwtUtil.generateToken(userDetails);
             List<String> roles = userDetails.getAuthorities().stream()
                     .map(item -> item.getAuthority().replace("ROLE_", ""))

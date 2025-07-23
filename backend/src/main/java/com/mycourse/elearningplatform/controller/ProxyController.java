@@ -25,7 +25,7 @@ public class ProxyController {
     @Value("${nhost.region}")
     private String nhostRegion;
 
-    @Value("${nhost.admin.secret}")
+    @Value("${nhost.adminsecret.}")
     private String nhostAdminSecret;
 
     @Autowired
