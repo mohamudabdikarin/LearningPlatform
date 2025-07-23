@@ -41,13 +41,6 @@ git clone https://github.com/your-username/learnify.git
 cd learnify
 ```
 
-### 2. Environment Variables
-
-#### Frontend
-
-- Copy `.env.example` to `.env` in the `frontend/` folder if provided.
-- Usually, you may need to set the backend API URL (defaults to `http://localhost:8080`).
-
 #### Backend
 
 - Edit `backend/src/main/resources/application.properties` for your PostgreSQL connection.
@@ -66,7 +59,7 @@ cd learnify
 4. Copy the **Admin Secret**
 5. Replace `YOUR_ACTUAL_NHOST_ADMIN_SECRET_HERE` in `application.properties`
 
-### 3. Backend Setup
+### 2. Backend Setup
 
 ```sh
 cd backend
@@ -74,7 +67,7 @@ cd backend
 ```
 - The backend will start on [http://localhost:8080] by default.
 
-### 4. Frontend Setup
+### 3. Frontend Setup
 
 ```sh
 cd frontend
@@ -83,21 +76,11 @@ npm run dev
 ```
 - The frontend will start on [http://localhost:5173](http://localhost:5173) (or as shown in your terminal).
 
-### 5. Using the App
+### 4. Using the App
 
 - Open your browser and go to [http://localhost:5173](http://localhost:5173)
 - Register as a student or teacher and start exploring!
 
----
-
-## Screenshots
-
-> _Add screenshots here if you have them, e.g.:_
->
-> ![Home Page](screenshots/homepage.png)
-> ![Teacher Dashboard](screenshots/teacher-dashboard.png)
-
----
 
 ## Folder Structure
 
@@ -134,8 +117,3 @@ frontend/
 - Responsive, modern UI with dark mode
 
 ---
-
-## Contact / Author Info
-
-Made with ❤️ by my team.
-Feel free to open issues or reach out if you have questions
