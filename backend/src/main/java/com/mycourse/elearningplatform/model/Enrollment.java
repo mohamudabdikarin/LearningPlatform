@@ -1,5 +1,6 @@
 package com.mycourse.elearningplatform.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,10 +21,12 @@ public class Enrollment {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"enrollments", "courses", "password", "email", "enabled", "accountNonExpired", "accountNonLocked", "credentialsNonExpired"})
     private User user;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "course_id")
+    @JsonIgnoreProperties({"enrollments", "instructor"})
     private Course course;
 
     private LocalDateTime enrolledAt = LocalDateTime.now();

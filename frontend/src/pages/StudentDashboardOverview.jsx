@@ -5,6 +5,12 @@ import { apiFetch } from '../services/apiService';
 import { BookOpen, Clock, Award, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+// Helper function to get proxy URL for files (replaces useSignedImageUrl hook)
+const getProxyUrl = (fileId) => {
+  if (!fileId) return null;
+  return `http://localhost:8080/api/proxy/image/${fileId}`;
+};
+
 const StudentDashboardOverview = () => {
   const { user } = useAuth();
   const { darkMode } = useDarkMode();
@@ -123,41 +129,44 @@ const StudentDashboardOverview = () => {
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Continue Learning</h2>
           {recentCourses.length > 0 ? (
             <div className="space-y-4">
-              {recentCourses.map((enrollment) => (
-                <div key={enrollment.id} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg flex-shrink-0">
-                    {enrollment.course.imageUrl ? (
-                      <img 
-                        src={enrollment.course.imageUrl} 
-                        alt={enrollment.course.title}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="w-6 h-6 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{enrollment.course.title}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {enrollment.course.instructor?.firstName} {enrollment.course.instructor?.lastName}
-                    </p>
-                    <div className="mt-2 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                      <div 
-                        className="bg-indigo-600 h-2 rounded-full" 
-                        style={{ width: `${enrollment.progress || 0}%` }}
-                      ></div>
+              {recentCourses.map((enrollment) => {
+                const proxyImageUrl = getProxyUrl(enrollment.course?.imageFileId);
+                return (
+                  <div key={enrollment.id} className="flex items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg flex-shrink-0">
+                      {proxyImageUrl ? (
+                        <img
+                          src={proxyImageUrl}
+                          alt={enrollment.course?.title}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BookOpen className="w-6 h-6 text-gray-400" />
+                        </div>
+                      )}
                     </div>
+                    <div className="ml-4 flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{enrollment.course?.title}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {enrollment.course?.instructor?.firstName} {enrollment.course?.instructor?.lastName}
+                      </p>
+                      <div className="mt-2 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                        <div 
+                          className="bg-indigo-600 h-2 rounded-full" 
+                          style={{ width: `${enrollment.progress || 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    <button 
+                      className="ml-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      onClick={() => navigate(`/dashboard/student/course/${enrollment.course?.id}`)}
+                    >
+                      Continue
+                    </button>
                   </div>
-                  <button 
-                    className="ml-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                    onClick={() => navigate(`/courses/${enrollment.course.id}/resources`)}
-                  >
-                    Continue
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8">

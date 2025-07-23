@@ -18,7 +18,8 @@ const MediaUpload = ({ onUpload, folder = '', acceptedTypes = "*/*" }) => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/upload', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+      const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         body: formData,
         headers: {

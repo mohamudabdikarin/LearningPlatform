@@ -4,6 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { useDarkMode } from '../context/DarkModeContext';
 import { CheckCircle, Clock, Award, BookOpen, AlertCircle, TrendingUp, Calendar, Target, Star } from 'lucide-react';
 
+// Helper function to get proxy URL for files (replaces useSignedImageUrl hook)
+const getProxyUrl = (fileId) => {
+  if (!fileId) return null;
+  return `http://localhost:8080/api/proxy/image/${fileId}`;
+};
+
 const StudentProgressPage = () => {
   const { user } = useAuth();
   const { darkMode } = useDarkMode();
@@ -364,53 +370,56 @@ const StudentProgressPage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {enrollments.map((enrollment) => (
-                      <tr key={enrollment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {enrollment.course?.imageUrl ? (
-                              <img 
-                                src={enrollment.course.imageUrl} 
-                                alt={enrollment.course.title} 
-                                className="w-10 h-10 rounded-md object-cover mr-3"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-md bg-gray-200 dark:bg-gray-700 mr-3 flex items-center justify-center">
-                                <BookOpen size={16} className="text-gray-500 dark:text-gray-400" />
-                              </div>
-                            )}
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {enrollment.course?.title || 'Unknown Course'}
-                              </div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {enrollment.course?.instructor?.firstName} {enrollment.course?.instructor?.lastName}
+                    {enrollments.map((enrollment) => {
+                      const proxyImageUrl = getProxyUrl(enrollment.course?.imageFileId);
+                      return (
+                        <tr key={enrollment.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {proxyImageUrl ? (
+                                <img
+                                  src={proxyImageUrl}
+                                  alt={enrollment.course?.title}
+                                  className="w-10 h-10 rounded-md object-cover mr-3"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-md bg-gray-200 dark:bg-gray-700 mr-3 flex items-center justify-center">
+                                  <BookOpen size={16} className="text-gray-500 dark:text-gray-400" />
+                                </div>
+                              )}
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {enrollment.course?.title || 'Unknown Course'}
+                                </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  {enrollment.course?.instructor?.firstName} {enrollment.course?.instructor?.lastName}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-1">
-                            <div 
-                              className={`h-2.5 rounded-full ${getProgressColor(enrollment.progress)}`} 
-                              style={{ width: `${enrollment.progress || 0}%` }}
-                            ></div>
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {formatProgress(enrollment.progress || 0)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {enrollment.course?.duration || 'N/A'} hours
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {enrollment.lastActivityDate ? new Date(enrollment.lastActivityDate).toLocaleDateString() : 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(enrollment.progress || 0)}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-1">
+                              <div 
+                                className={`h-2.5 rounded-full ${getProgressColor(enrollment.progress)}`} 
+                                style={{ width: `${enrollment.progress || 0}%` }}
+                              ></div>
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatProgress(enrollment.progress || 0)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {enrollment.course?.duration || 'N/A'} hours
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {enrollment.lastActivityDate ? new Date(enrollment.lastActivityDate).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(enrollment.progress || 0)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -23,27 +23,58 @@ const TeacherDashboardOverview = () => {
     setLoading(true);
     setError('');
     
-    // Use the simpler endpoint without user ID
-    apiFetch('/users/teacher-dashboard')
-      .then(data => {
+    // Use a more reliable approach with fallback data
+    const fetchDashboardData = async () => {
+      try {
+        // First try the teacher dashboard endpoint (now with user.id)
+        const data = await apiFetch(`/users/teacher-dashboard/${user.id}`, { 
+          retry: true,
+          retryAttempts: 2
+        });
         console.log('Teacher dashboard data:', data);
         setStats(data);
-      })
-      .catch(e => {
+      } catch (e) {
         console.error('Teacher dashboard error:', e);
-        setError(e.message || 'Failed to load dashboard data');
         
-        // If there's an error, try to get debug info
-        apiFetch('/users/debug/roles')
-          .then(debug => {
-            console.log('Debug info:', debug);
-            setDebugInfo(debug);
-          })
-          .catch(debugError => {
-            console.error('Debug error:', debugError);
+        // If that fails, try to get course stats directly
+        try {
+          // Fallback: Get courses taught by this teacher
+          const courses = await apiFetch('/courses/teacher');
+          
+          // Calculate stats from courses
+          let studentCount = 0;
+          let lessonCount = 0;
+          
+          // Process course data to extract stats
+          courses.forEach(course => {
+            studentCount += course.enrollmentCount || 0;
+            lessonCount += course.resourceCount || 0;
           });
-      })
-      .finally(() => setLoading(false));
+          
+          setStats({
+            courses: courses.length,
+            students: studentCount,
+            lessons: lessonCount
+          });
+        } catch (fallbackError) {
+          // If all fails, show error and use default stats
+          setError(e.message || 'Failed to load dashboard data');
+          setStats({ courses: 0, students: 0, lessons: 0 });
+          
+          // Try to get debug info
+          try {
+            const debug = await apiFetch('/users/me');
+            setDebugInfo(debug);
+          } catch (debugError) {
+            console.error('Debug error:', debugError);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDashboardData();
   }, [user]);
 
   if (!user) {
@@ -80,54 +111,6 @@ const TeacherDashboardOverview = () => {
             </div>
           </div>
           
-          {/* Debug Section */}
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-700 dark:text-yellow-300 p-4 rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <Bug className="w-5 h-5 mr-2" />
-                <span className="font-medium">Debug Information</span>
-              </div>
-              <button
-                onClick={() => setShowDebug(!showDebug)}
-                className="text-sm underline"
-              >
-                {showDebug ? 'Hide' : 'Show'} Debug Info
-              </button>
-            </div>
-            
-            {showDebug && debugInfo && (
-              <div className="mt-3 text-sm space-y-2">
-                <div><strong>User ID:</strong> {debugInfo.userId}</div>
-                <div><strong>Email:</strong> {debugInfo.email}</div>
-                <div><strong>Name:</strong> {debugInfo.firstName} {debugInfo.lastName}</div>
-                <div><strong>Database Roles:</strong> {debugInfo.databaseRoles?.join(', ') || 'None'}</div>
-                <div><strong>JWT Authorities:</strong> {debugInfo.jwtAuthorities?.join(', ') || 'None'}</div>
-                <div><strong>Has TEACHER Role:</strong> {debugInfo.hasTeacherRole ? 'Yes' : 'No'}</div>
-                <div><strong>Frontend User Roles:</strong> {user.roles?.join(', ') || 'None'}</div>
-              </div>
-            )}
-            
-            {!debugInfo && (
-              <div className="mt-2 text-sm">
-                <p>Unable to load debug information. This might help identify the issue.</p>
-                <button
-                  onClick={() => {
-                    apiFetch('/users/debug/roles')
-                      .then(debug => {
-                        console.log('Debug info:', debug);
-                        setDebugInfo(debug);
-                      })
-                      .catch(debugError => {
-                        console.error('Debug error:', debugError);
-                      });
-                  }}
-                  className="mt-2 px-3 py-1 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700"
-                >
-                  Try Debug Again
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       ) : (
         <>
@@ -154,26 +137,6 @@ const TeacherDashboardOverview = () => {
             })}
           </div>
           
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <button className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left">
-                <BookOpen className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mb-2" />
-                <h3 className="font-medium text-gray-900 dark:text-white">Create Course</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Start building a new course</p>
-              </button>
-              <button className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left">
-                <Users className="w-6 h-6 text-green-600 dark:text-green-400 mb-2" />
-                <h3 className="font-medium text-gray-900 dark:text-white">View Students</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Check student progress</p>
-              </button>
-              <button className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left">
-                <Layers className="w-6 h-6 text-amber-600 dark:text-amber-400 mb-2" />
-                <h3 className="font-medium text-gray-900 dark:text-white">Upload Resources</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Add course materials</p>
-              </button>
-            </div>
-          </div>
         </>
       )}
       

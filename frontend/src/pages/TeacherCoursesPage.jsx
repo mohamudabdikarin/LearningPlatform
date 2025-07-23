@@ -5,7 +5,23 @@ import { useDarkMode } from '../context/DarkModeContext';
 import { Star, Clock, BarChart3 } from 'lucide-react';
 import { Pencil, Trash2 } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
-const emptyCourse = { title: '', description: '', price: '', imageUrl: '', videoUrl: '', discountPrice: '', discountActive: false };
+const emptyCourse = { title: '', description: '', price: '', imageUrl: '', discountPrice: '', discountActive: false };
+const PLACEHOLDER_IMAGE_URL = '/uploads/placeholder.png'; // Fallback image when uploads fail
+const BACKEND_URL = "http://localhost:8080"; // Backend URL for proxy
+
+// Helper function to convert Nhost URLs to proxy URLs for display
+const getDisplayUrl = (url, isVideo = false) => {
+    if (!url) return null;
+    if (url.startsWith('blob:')) return url; // Local preview URLs
+    if (url.includes('nhost.run')) {
+        // Extract file ID from Nhost URL and use proxy
+        const match = url.match(/\/v1\/files\/([^/?]+)/);
+        if (match && match[1]) {
+            return `${BACKEND_URL}/api/proxy/${isVideo ? 'file' : 'image'}/${match[1]}`;
+        }
+    }
+    return url; // Return as-is for other URLs
+};
 
 const extractDriveFileId = (urlOrId) => {
     if (!urlOrId) return '';
@@ -33,9 +49,11 @@ const TeacherCoursesPage = () => {
     const [imgError, setImgError] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [selectedFileName, setSelectedFileName] = useState('');
+    const [selectedImageFile, setSelectedImageFile] = useState(null);
     const modalRef = useRef(null);
     const [deleteId, setDeleteId] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [localImagePreview, setLocalImagePreview] = useState(null);
 
 
     useEffect(() => {
@@ -98,73 +116,90 @@ const TeacherCoursesPage = () => {
         }
     };
 
-    const handleImageUpload = async e => {
+    const handleImageSelect = e => {
         const file = e.target.files[0];
         if (!file) return;
-        setSelectedFileName(file.name);
-        setImgUploading(true);
+        
         setImgError('');
+        
+        // Check file size before storing
+        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+        if (file.size > MAX_FILE_SIZE) {
+            setImgError(`File size exceeds 5MB limit. Please choose a smaller image.`);
+            return;
+        }
+
+        setSelectedFileName(file.name);
+        setSelectedImageFile(file);
+        setLocalImagePreview(URL.createObjectURL(file)); // Show instant preview
+    };
+
+    const uploadImageFile = async () => {
+        if (!selectedImageFile) return null;
+
+        setImgUploading(true);
         try {
             const formData = new FormData();
-            formData.append('file', file);
-            let res;
-            try {
-                res = await apiFetch('/upload', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {},
-                });
-            } catch (err) {
-                // If backend returns non-JSON error, show generic error
-                setImgError(err.message || 'Image upload failed.');
-                setImgUploading(false);
-                return;
+            formData.append('file', selectedImageFile);
+
+            // If we're editing a course and it has an existing image, extract the file ID
+            // to tell the backend to delete it before uploading the new one
+            let existingFileId = null;
+            if (form.imageUrl && form.imageUrl.includes('nhost.run')) {
+                // Extract file ID from Nhost URL
+                const match = form.imageUrl.match(/\/v1\/files\/([^/?]+)/);
+                if (match && match[1]) {
+                    existingFileId = match[1];
+                    formData.append('existingFileId', existingFileId);
+                    console.log('Replacing existing file:', existingFileId);
+                }
             }
+
+            // Implement retry logic for uploads
+            const maxRetries = 3;
+            let retryCount = 0;
+            let res = null;
+
+            while (retryCount < maxRetries) {
+                try {
+                    res = await apiFetch('/upload', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {},
+                        timeout: 60000, // Increase timeout for uploads to 60 seconds
+                    });
+
+                    if (res && res.url) {
+                        break; // Success, exit retry loop
+                    } else {
+                        throw new Error('Upload response missing URL');
+                    }
+                } catch (err) {
+                    retryCount++;
+                    console.log(`Upload attempt ${retryCount} failed:`, err.message);
+
+                    if (retryCount >= maxRetries) {
+                        // All retries failed
+                        throw err;
+                    }
+
+                    // Wait before retrying (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+                }
+            }
+
             if (res && res.url) {
-                setForm(f => ({ ...f, imageUrl: res.url }));
+                return res.url;
             } else {
-                setImgError('Image upload failed. Please try again.');
+                throw new Error('Upload failed - no URL returned');
             }
         } catch (e) {
-            setImgError(e.message || 'Image upload failed.');
+            console.error('Image upload error:', e);
+            setImgError(`Upload failed: ${e.message || 'Connection error'}. Please try again later.`);
+            throw e;
         } finally {
             setImgUploading(false);
         }
-    };
-
-    const handleVideoUpload = async e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        setSelectedVideoName(file.name);
-        setVideoUploading(true);
-        setVideoError('');
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            const res = await apiFetch('/upload', {
-                method: 'POST',
-                body: formData,
-                headers: {}, // Let browser set Content-Type
-            });
-            const url = await res;
-            setForm(f => ({ ...f, videoUrl: url }));
-        } catch (e) {
-            setVideoError('Video upload failed.');
-        } finally {
-            setVideoUploading(false);
-        }
-    };
-
-    const handleRemoveVideo = async () => {
-        if (!form.videoUrl) return;
-        const filename = form.videoUrl.split('/').pop();
-        try {
-            await apiFetch(`/upload/${filename}`, { method: 'DELETE' });
-        } catch (e) {
-            // Optionally show error, but allow removal from form
-        }
-        setForm(f => ({ ...f, videoUrl: '' }));
-        setSelectedVideoName('');
     };
 
     const validateForm = () => {
@@ -212,31 +247,44 @@ const TeacherCoursesPage = () => {
             );
             return;
         }
+        
         try {
+            // Upload image first if there's a selected file
+            let formToSubmit = { ...form };
+            if (selectedImageFile) {
+                const imageUrl = await uploadImageFile();
+                formToSubmit.imageUrl = imageUrl;
+            }
+
             let createdOrUpdated;
             if (editId) {
                 createdOrUpdated = await apiFetch(`/courses/${editId}`, {
                     method: 'PUT',
-                    body: JSON.stringify({ ...form, id: editId, instructor: form.instructor }),
+                    body: JSON.stringify({ ...formToSubmit, id: editId, instructor: formToSubmit.instructor }),
                 });
                 setCourses(courses.map(c => (c.id === editId ? createdOrUpdated : c)));
                 setSuccess('Course updated!');
             } else {
                 createdOrUpdated = await apiFetch('/courses', {
                     method: 'POST',
-                    body: JSON.stringify(form),
+                    body: JSON.stringify(formToSubmit),
                 });
                 setCourses([...courses, createdOrUpdated]);
                 setSuccess('Course created!');
             }
+            
+            // Reset form and states
             setEditId(null);
             setForm(emptyCourse);
+            setSelectedImageFile(null);
+            setLocalImagePreview(null);
+            setSelectedFileName('');
             setShowForm(false);
 
-            if (form.discountActive && form.discountPrice) {
+            if (formToSubmit.discountActive && formToSubmit.discountPrice) {
                 await apiFetch(`/courses/${createdOrUpdated.id}/discount`, {
                     method: 'PUT',
-                    body: JSON.stringify({ discountPrice: form.discountPrice, discountActive: true }),
+                    body: JSON.stringify({ discountPrice: formToSubmit.discountPrice, discountActive: true }),
                     headers: { 'Content-Type': 'application/json' },
                 });
             } else {
@@ -253,6 +301,9 @@ const TeacherCoursesPage = () => {
     const handleCreateClick = () => {
         setEditId(null);
         setForm(emptyCourse);
+        setSelectedImageFile(null);
+        setLocalImagePreview(null);
+        setSelectedFileName('');
         setError('');
         setSuccess('');
         setImgError('');
@@ -304,27 +355,30 @@ const TeacherCoursesPage = () => {
                 )}
                 {/* Modal for Create/Edit Course */}
                 {showForm && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
                         <div
                             ref={modalRef}
                             tabIndex={-1}
                             role="dialog"
                             aria-modal="true"
-                            className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-y-auto w-full max-w-2xl mx-auto p-4 sm:p-6 focus:outline-none "
+                            className="relative bg-white dark:bg-gray-800 max-h-[500px] rounded-2xl shadow-xl overflow-y-auto  max-w-2xl mx-auto p-4 sm:p-6 md:p-8 focus:outline-none"
+
                         >
                             <button
-                                className="absolute top-2 right-2 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl"
-                                onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setError(''); setSuccess(''); setImgError(''); }}
+                                className="absolute top-3 right-2 sm:top-4 sm:right-4 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-3xl z-10 w-8 h-8 flex items-center justify-center rounded-full dark:hover:bg-gray-700 transition-colors"
+                                onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setSelectedImageFile(null); setLocalImagePreview(null); setSelectedFileName(''); setError(''); setSuccess(''); setImgError(''); }}
                                 aria-label="Close"
                             >
                                 &times;
                             </button>
-                            <h2 className="text-xl sm:text-2xl font-bold text-center mb-2 text-gray-900 dark:text-white">
-                                {editId ? 'Edit Course' : 'Create a New Course'}
-                            </h2>
-                            <p className="text-center text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 text-sm sm:text-base">
-                                Enter course details below.
-                            </p>
+                            <div className="mb-6 sm:mb-8">
+                                <h2 className="text-xl sm:text-2xl font-bold text-center mb-2 text-gray-900 dark:text-white">
+                                    {editId ? 'Edit Course' : 'Create a New Course'}
+                                </h2>
+                                <p className="text-center text-gray-600 dark:text-gray-400 text-sm sm:text-base">
+                                    Enter course details below.
+                                </p>
+                            </div>
 
                             {success && (
                                 <div className="bg-green-100 dark:bg-green-900/30 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg relative mb-4 text-sm" role="alert">
@@ -358,13 +412,14 @@ const TeacherCoursesPage = () => {
                                 </div>
                             )}
 
-                            <form onSubmit={handleSubmit} className="space-y-5">
+                            <form onSubmit={handleSubmit}>
                                 {/* Mobile-first vertical layout, desktop horizontal */}
-                                <div className="space-y-5 md:space-y-0 md:grid md:grid-cols-2 md:gap-8">
+                                {/* Responsive form layout - stacks on mobile, grid on larger screens */}
+                                <div className="grid w-full grid-cols-1 md:grid-cols-2 gap-3 md:gap-8">
                                     {/* Left Column - Basic Info */}
-                                    <div className="space-y-4">
-                                        <div className="space-y-1">
-                                            <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label htmlFor="title" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                                                 Course Title <span className="text-red-500">*</span>
                                             </label>
                                             <input
@@ -372,14 +427,12 @@ const TeacherCoursesPage = () => {
                                                 name="title"
                                                 value={form.title}
                                                 onChange={handleChange}
-                                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm"
+                                                className="w-full px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm sm:text-base"
                                                 required
-                                                placeholder="e.g., Complete Web Development Bootcamp"
                                             />
                                         </div>
-
-                                        <div className="space-y-1">
-                                            <label htmlFor="description" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        <div>
+                                            <label htmlFor="description" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                                                 Description <span className="text-red-500">*</span>
                                             </label>
                                             <textarea
@@ -387,19 +440,16 @@ const TeacherCoursesPage = () => {
                                                 name="description"
                                                 value={form.description}
                                                 onChange={handleChange}
-                                                rows="4"
-                                                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm resize-none"
+                                                className="w-full px-4 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm sm:text-base"
                                                 required
-                                                placeholder="Describe what students will learn in this course..."
                                             />
                                         </div>
-
-                                        <div className="space-y-1">
-                                            <label htmlFor="price" className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        <div>
+                                            <label htmlFor="price" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                                                 Price (USD) <span className="text-red-500">*</span>
                                             </label>
                                             <div className="relative">
-                                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">$</span>
+                                                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-base">$</span>
                                                 <input
                                                     id="price"
                                                     name="price"
@@ -408,72 +458,77 @@ const TeacherCoursesPage = () => {
                                                     step="0.01"
                                                     value={form.price}
                                                     onChange={handleChange}
-                                                    className="w-full pl-8 pr-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm"
+                                                    className="w-full pl-9 pr-4 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600 transition-colors text-sm sm:text-base"
                                                     required
-                                                    placeholder="99.00"
                                                 />
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Right Column - Media & Pricing */}
-                                    <div className="space-y-4">
-                                        <div className="space-y-1">
-                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {/* Right Column - Image & Discount */}
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                                                 Course Image
                                             </label>
                                             <div className="space-y-3">
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex flex-wrap items-center gap-3">
                                                     <input
                                                         id="course-image-input"
                                                         type="file"
                                                         accept="image/*"
-                                                        onChange={handleImageUpload}
+                                                        onChange={handleImageSelect}
                                                         className="hidden"
                                                         disabled={imgUploading}
                                                     />
                                                     <label
                                                         htmlFor="course-image-input"
-                                                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 text-sm font-medium"
+                                                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors border border-gray-300 dark:border-gray-600 text-sm font-medium"
                                                     >
                                                         {imgUploading ? (
                                                             <>
-                                                                <svg className="animate-spin h-4 w-4 text-indigo-600" viewBox="0 0 24 24">
-                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                                                                </svg>
-                                                                Uploading...
+                                                                <svg className="animate-spin h-5 w-5 text-indigo-600" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                                                                <span>Uploading...</span>
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                </svg>
-                                                                Choose Image
+                                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                                <span>Choose Image</span>
                                                             </>
                                                         )}
                                                     </label>
                                                     {selectedFileName && !imgUploading && (
-                                                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px] md:max-w-[150px]">
-                                                            {selectedFileName}
-                                                        </span>
+                                                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-full sm:max-w-[200px]">{selectedFileName}</span>
+                                                    )}
+                                                    {imgError && selectedFileName && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const fileInput = document.getElementById('course-image-input');
+                                                                if (fileInput && fileInput.files && fileInput.files[0]) {
+                                                                    handleImageSelect({ target: { files: fileInput.files } });
+                                                                }
+                                                            }}
+                                                            className="inline-flex items-center justify-center gap-1 px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-800/30 transition-colors text-xs font-medium"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                            Retry Upload
+                                                        </button>
                                                     )}
                                                 </div>
                                                 {imgError && <p className="text-red-500 text-xs">{imgError}</p>}
-                                                {form.imageUrl && (
-                                                    <div className="relative">
+                                                {(localImagePreview || form.imageUrl) && (
+                                                    <div className="relative mt-2">
                                                         <img
-                                                            src={form.imageUrl}
+                                                            src={localImagePreview || getDisplayUrl(form.imageUrl)}
                                                             alt="Course preview"
-                                                            className="w-full h-32 sm:h-28 object-cover rounded-lg border border-gray-200 dark:border-gray-600"
+                                                            className="w-full h-24 sm:h-28 object-cover rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm"
                                                         />
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-
-                                        <div className="space-y-1">
-                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                        <div className="mt-4">
+                                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
                                                 Discount Pricing
                                             </label>
                                             <div className="space-y-3">
@@ -483,14 +538,14 @@ const TeacherCoursesPage = () => {
                                                         id="discount-active"
                                                         checked={form.discountActive}
                                                         onChange={(e) => setForm((f) => ({ ...f, discountActive: e.target.checked }))}
-                                                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
+                                                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 rounded"
                                                     />
-                                                    <label htmlFor="discount-active" className="text-sm text-gray-700 dark:text-gray-300">
+                                                    <label htmlFor="discount-active" className="text-sm sm:text-base text-gray-700 dark:text-gray-300">
                                                         Enable discount pricing
                                                     </label>
                                                 </div>
                                                 <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm">$</span>
+                                                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-base">$</span>
                                                     <input
                                                         name="discountPrice"
                                                         type="number"
@@ -498,10 +553,10 @@ const TeacherCoursesPage = () => {
                                                         step="0.01"
                                                         value={form.discountPrice}
                                                         onChange={handleChange}
-                                                        className={`w-full pl-8 pr-3 py-2.5 rounded-lg border transition-colors text-sm
+                                                        className={`w-full pl-9 pr-4 py-3 rounded-lg border transition-colors text-sm sm:text-base
                                                         ${!form.discountActive
-                                                                ? 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 cursor-not-allowed'
-                                                                : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600'} 
+                                                            ? 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                                            : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-indigo-600'} 
                                                         placeholder-gray-400 dark:placeholder-gray-500`}
                                                         placeholder="49.00"
                                                         disabled={!form.discountActive}
@@ -511,21 +566,20 @@ const TeacherCoursesPage = () => {
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="pt-4 flex flex-col sm:flex-row gap-3 sm:space-x-4">
+                                <div className="mt-6 flex sm:flex-row gap-3 sm:gap-4 border-gray-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setSelectedImageFile(null); setLocalImagePreview(null); setSelectedFileName(''); setError(''); setSuccess(''); setImgError(''); }}
+                                        className="w-auto min-w-[100px] text-sm py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 dark:focus:ring-offset-gray-800 transition-all duration-300"
+                                    >
+                                        Cancel
+                                    </button>
                                     <button
                                         type="submit"
                                         disabled={imgUploading}
-                                        className="w-full sm:w-auto py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                                        className="w-auto min-w-[100px] text-sm py-2 px-4 border border-transparent rounded-lg shadow-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
                                     >
                                         {editId ? 'Update Course' : 'Create Course'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="w-full sm:w-auto py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-bold text-indigo-600 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-600 dark:focus:ring-offset-gray-800 transition-all duration-300"
-                                        onClick={() => { setShowForm(false); setEditId(null); setForm(emptyCourse); setError(''); setSuccess(''); setImgError(''); }}
-                                    >
-                                        Cancel
                                     </button>
                                 </div>
                             </form>

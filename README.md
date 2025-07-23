@@ -51,13 +51,20 @@ cd learnify
 #### Backend
 
 - Edit `backend/src/main/resources/application.properties` for your PostgreSQL connection.
-- Example:
+- **IMPORTANT**: Replace the Nhost admin secret placeholder with your actual admin secret:
+  ```properties
+  # Get your admin secret from Nhost Dashboard -> Settings -> API Tokens -> Admin Secret
+  nhost.admin.secret=YOUR_ACTUAL_NHOST_ADMIN_SECRET_FROM_DASHBOARD
   ```
-  spring.datasource.url=jdbc:postgresql://localhost:5432/your_db
-  spring.datasource.username=your_user
-  spring.datasource.password=your_password
-  ```
-- You can use the provided Supabase connection or set up your own local database.
+- The database connection is already configured for Nhost PostgreSQL.
+
+#### Getting Your Nhost Admin Secret
+
+1. Go to [Nhost Dashboard](https://app.nhost.io/)
+2. Select your project: `rzkysfcwirbfuctnzvzf`
+3. Navigate to **Settings** → **API Tokens**
+4. Copy the **Admin Secret**
+5. Replace `YOUR_ACTUAL_NHOST_ADMIN_SECRET_HERE` in `application.properties`
 
 ### 3. Backend Setup
 

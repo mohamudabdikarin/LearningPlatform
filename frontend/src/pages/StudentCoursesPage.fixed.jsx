@@ -154,9 +154,8 @@ const StudentCoursesPage = () => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {enrolledCourses.map((enrollment) => {
-                  // With the new DTO structure, course is a property of the enrollment DTO
-                  const proxyImageUrl = getProxyUrl(enrollment.course?.imageFileId);
-                  const rating = courseRatings[enrollment.course?.id] || { average: 0, count: 0 };
+                  const proxyImageUrl = getProxyUrl(enrollment.course.imageFileId);
+                  const rating = courseRatings[enrollment.course.id] || { average: 0, count: 0 };
                   
                   return (
                     <div key={enrollment.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-100 dark:border-gray-700 overflow-hidden hover:shadow-xl transition-all duration-300">

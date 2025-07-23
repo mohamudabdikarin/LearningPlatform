@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../services/apiService';
 
 function formatPrice(price) {
     return Number(price).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -19,8 +18,28 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
     // Real rating and enrolled count
     const [ratingSummary, setRatingSummary] = useState({ average: 0, count: 0, enrolled: 0 });
     useEffect(() => {
-        apiFetch(`/courses/${course.id}/rating-summary`).then(setRatingSummary).catch(() => {});
+        // ... existing code ...
     }, [course.id]);
+
+    // Public image URL state - use proxy to avoid CORS issues
+    const [publicImageUrl, setPublicImageUrl] = useState(null);
+    useEffect(() => {
+        let fileId = null;
+        if (course.imageFileId) {
+            fileId = course.imageFileId;
+        } else if (course.imageUrl && course.imageUrl.includes('nhost.run')) {
+            const match = course.imageUrl.match(/\/v1\/files\/([^/?]+)/);
+            if (match && match[1]) {
+                fileId = match[1];
+            }
+        }
+        if (fileId) {
+            // Use backend proxy to avoid CORS issues
+            setPublicImageUrl(`${BACKEND_URL}/api/proxy/image/${fileId}`);
+        } else {
+            setPublicImageUrl(null);
+        }
+    }, [course.imageFileId, course.imageUrl]);
 
     // Helper: is student
     const isStudent = user && user.roles && user.roles.includes('STUDENT');
@@ -45,9 +64,9 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
             {/* Image */}
             <div className="relative w-full bg-gray-100 dark:bg-gray-700 rounded-t-2xl overflow-hidden">
                 <div className="aspect-[16/9] w-full">
-                    {course.imageUrl ? (
+                    {publicImageUrl ? (
                         <img
-                            src={course.imageUrl.startsWith('/uploads/') ? BACKEND_URL + course.imageUrl : course.imageUrl}
+                            src={publicImageUrl}
                             alt={course.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -56,7 +75,7 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
                             }}
                         />
                     ) : null}
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-700" style={{ display: course.imageUrl ? 'none' : 'flex' }}>
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-gray-700" style={{ display: publicImageUrl ? 'none' : 'flex' }}>
                         <div className="text-center">
                             <div className="w-16 h-16 bg-gray-200 dark:bg-gray-600 rounded-lg flex items-center justify-center mx-auto mb-2">
                                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

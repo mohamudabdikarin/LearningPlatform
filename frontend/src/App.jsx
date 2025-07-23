@@ -10,7 +10,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import EmailVerificationPage from './pages/EmailVerificationPage';
-import ProfilePage from './pages/ProfilePage';
+// ProfilePage removed - using StudentProfilePage in dashboard instead
 import TeacherCoursesPage from './pages/TeacherCoursesPage';
 import EnrolledCoursesPage from './pages/EnrolledCoursesPage';
 import QuizPage from './pages/QuizPage';
@@ -44,7 +44,7 @@ function App() {
             <Route path="/verify-email" element={<EmailVerificationPage />} />
             <Route path="/courses" element={<CoursesListPage />} />
             <Route path="/courses/:courseId" element={<CourseViewerPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            {/* Profile route removed - use /dashboard/student/profile instead */}
             <Route path="/my-courses" element={<TeacherCoursesPage />} />
             <Route path="/enrollments" element={<EnrolledCoursesPage />} />
             <Route path="/enroll/:courseId" element={<EnrollPage />} />

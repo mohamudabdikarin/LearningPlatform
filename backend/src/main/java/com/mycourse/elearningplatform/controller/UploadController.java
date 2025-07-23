@@ -1,16 +1,13 @@
 package com.mycourse.elearningplatform.controller;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.mycourse.elearningplatform.service.NhostStorageService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.MediaType;
 
 import java.util.UUID;
 import java.util.Map;
@@ -18,103 +15,109 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/upload")
 public class UploadController {
-    
-    @Value("${supabase.url}")
-    private String supabaseUrl;
-    
-    @Value("${supabase.service.key}")
-    private String supabaseServiceKey;
-    
-    private final RestTemplate restTemplate = new RestTemplate();
 
+    // Injecting NhostStorageService for file operations
+    @Autowired
+    private NhostStorageService nhostStorageService;
+
+    // Upload endpoint - Only accessible by users with 'TEACHER' role
     @PreAuthorize("hasRole('TEACHER')")
     @PostMapping
-    public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadFile(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "existingFileId", required = false) String existingFileId) {
+
         System.out.println("[DEBUG] UploadController - Uploading file: " + file.getOriginalFilename());
-        System.out.println("[DEBUG] Supabase URL: " + supabaseUrl);
-        
+        if (existingFileId != null && !existingFileId.isEmpty()) {
+            System.out.println("[DEBUG] Replacing existing file: " + existingFileId);
+        }
+
         try {
+            // Validate file is not empty
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Please select a file to upload"));
             }
 
-            // Generate unique filename
+            // Clean and extract file extension
             String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
             String fileExtension = "";
             if (originalFilename.contains(".")) {
                 fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
             }
+
+            // Generate a new unique filename
             String filename = UUID.randomUUID().toString() + fileExtension;
-            
-            return uploadToSupabase(file, filename);
-            
+
+            // Upload to Nhost (default bucket). Pass existingFileId for replacement.
+            Map<String, Object> uploadResult = nhostStorageService.uploadFile(file, "default", filename, existingFileId);
+
+            System.out.println("Upload result: " + uploadResult);
+
+            // Check if upload was successful and ID is returned
+            if (uploadResult != null && uploadResult.containsKey("id")) {
+                String fileId = (String) uploadResult.get("id");
+                String fileUrl = (String) uploadResult.get("url");
+                if (fileUrl == null) {
+                    fileUrl = nhostStorageService.getFileUrl(fileId);
+                }
+
+                System.out.println("File uploaded successfully - ID: " + fileId + ", URL: " + fileUrl);
+
+                return ResponseEntity.ok(Map.of(
+                        "url", fileUrl,
+                        "fileId", fileId,
+                        "filename", filename,
+                        "storage", uploadResult.containsKey("storage") ? uploadResult.get("storage") : "nhost"
+                ));
+            } else {
+                System.err.println("Upload failed - response: " + uploadResult);
+                throw new RuntimeException("Upload failed - no file ID returned");
+            }
+
         } catch (Exception e) {
+            // Catch any upload error
             e.printStackTrace();
             System.out.println("[ERROR] Exception during upload: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Failed to upload file: " + e.getMessage()));
-        }
-    }
-    
-    private ResponseEntity<?> uploadToSupabase(MultipartFile file, String filename) throws Exception {
-        String bucket = "media";
-        String storageUrl = supabaseUrl + "/storage/v1/object/" + bucket + "/" + filename;
-        
-        System.out.println("[DEBUG] Uploading to: " + storageUrl);
-        
-        HttpHeaders headers = new HttpHeaders();
-        // Set the correct content type
-        String contentType = file.getContentType();
-        if (contentType != null) {
-            headers.setContentType(MediaType.parseMediaType(contentType));
-        } else {
-            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        }
-        headers.set("apikey", supabaseServiceKey);
-        headers.set("Authorization", "Bearer " + supabaseServiceKey);
-        
-        HttpEntity<byte[]> entity = new HttpEntity<>(file.getBytes(), headers);
-        
-        ResponseEntity<String> response = restTemplate.exchange(
-            storageUrl,
-            org.springframework.http.HttpMethod.POST,
-            entity,
-            String.class
-        );
-        
-        System.out.println("[DEBUG] Supabase upload response: " + response.getStatusCode() + " - " + response.getBody());
-        
-        if (response.getStatusCode().is2xxSuccessful()) {
-            String fileUrl = supabaseUrl + "/storage/v1/object/public/media/" + filename;
-            System.out.println("[DEBUG] Returning Supabase fileUrl: " + fileUrl);
-            return ResponseEntity.ok(Map.of("url", fileUrl));
-        } else {
-            throw new RuntimeException("Supabase upload failed: " + response.getBody());
+                    .body(Map.of("error", "Failed to upload file: " + e.getMessage()));
         }
     }
 
+    // Delete endpoint - Only accessible by TEACHER role
     @PreAuthorize("hasRole('TEACHER')")
-    @DeleteMapping("/{filename}")
-    public ResponseEntity<?> deleteFile(@PathVariable String filename) {
+    @DeleteMapping("/{fileId}")
+    public ResponseEntity<?> deleteFile(@PathVariable String fileId) {
         try {
-            deleteFromSupabase(filename);
-            return ResponseEntity.ok(Map.of("message", "File deleted successfully"));
-            
+            // Call service to delete file
+            boolean deleted = nhostStorageService.deleteFile(fileId);
+            if (deleted) {
+                return ResponseEntity.ok(Map.of("message", "File deleted successfully"));
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Failed to delete file"));
+            }
+
         } catch (Exception e) {
-            System.out.println("[ERROR] Failed to delete from Supabase: " + e.getMessage());
+            // Handle any deletion error
+            System.out.println("[ERROR] Failed to delete from Nhost: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Failed to delete file: " + e.getMessage()));
+                    .body(Map.of("error", "Failed to delete file: " + e.getMessage()));
         }
     }
-    
-    private void deleteFromSupabase(String filename) throws Exception {
-        String storageUrl = supabaseUrl + "/storage/v1/object/media/" + filename;
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("apikey", supabaseServiceKey);
-        headers.set("Authorization", "Bearer " + supabaseServiceKey);
-        
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-        restTemplate.exchange(storageUrl, org.springframework.http.HttpMethod.DELETE, entity, String.class);
+
+    // Get signed URL for private file download (optional expiry param)
+    @PreAuthorize("hasRole('TEACHER')")
+    @GetMapping("/signed-url/{fileId}")
+    public ResponseEntity<?> getSignedUrl(@PathVariable String fileId, @RequestParam(defaultValue = "3600") int expiresIn) {
+        try {
+            // Ask service to generate a temporary access URL
+            Map<String, String> result = nhostStorageService.getSignedUrl(fileId, expiresIn);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            System.out.println("[ERROR] Failed to get signed URL from Nhost: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to get signed URL: " + e.getMessage()));
+        }
     }
-} 
+}

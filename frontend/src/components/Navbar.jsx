@@ -99,7 +99,7 @@ const Navbar = () => {
                             {profileMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 z-50 border border-gray-200 dark:border-gray-700">
                                     <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">Signed in as<br /><span className="font-semibold">{user.email}</span></div>
-                                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { setProfileMenuOpen(false); navigate('/profile'); }}>Profile</button>
+                                    <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { setProfileMenuOpen(false); navigate('/dashboard/student/profile'); }}>Profile</button>
                                     <button className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700" onClick={() => { setProfileMenuOpen(false); navigate('/dashboard'); }}>Dashboard</button>
                                     <button className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border-t border-gray-100 dark:border-gray-700" onClick={() => { setProfileMenuOpen(false); logout(); navigate('/'); }}>Logout</button>
                                 </div>
@@ -127,7 +127,7 @@ const Navbar = () => {
                         <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
                         {user ? (
                             <>
-                                <button className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => { setIsMenuOpen(false); navigate('/profile'); }}>Profile</button>
+                                {/* Profile button removed - use dashboard profile instead */}
                                 <button className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => { setIsMenuOpen(false); navigate('/dashboard'); }}>Dashboard</button>
                                 <button className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => { setIsMenuOpen(false); logout(); navigate('/'); }}>Logout</button>
                             </>

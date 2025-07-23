@@ -12,6 +12,8 @@
   "dependencies": {
     "@headlessui/react": "^2.2.4",
     "@heroicons/react": "^2.2.0",
+    "@nhost/nhost-js": "^3.0.0",
+    "@nhost/react": "^3.0.0",
     "@supabase/supabase-js": "^2.51.0",
     "lucide-react": "^0.525.0",
     "react": "^19.1.0",

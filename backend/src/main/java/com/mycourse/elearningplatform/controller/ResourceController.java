@@ -40,10 +40,21 @@ public class ResourceController {
         if (courseOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
         Course course = courseOpt.get();
         List<Resource> resources = resourceRepository.findByCourse(course);
-        return ResponseEntity.ok(resources);
+        // Map resources to include fileId instead of fileUrl
+        List<Map<String, Object>> resourceData = resources.stream().map(resource -> {
+            Map<String, Object> map = new java.util.HashMap<>();
+            map.put("id", resource.getId());
+            map.put("fileName", resource.getFileName());
+            map.put("fileId", extractFileIdFromNhostUrl(resource.getFileUrl()));
+            map.put("fileType", resource.getFileType());
+            map.put("fileSize", resource.getFileSize());
+            map.put("createdAt", resource.getCreatedAt());
+            map.put("updatedAt", resource.getUpdatedAt());
+            return map;
+        }).toList();
+        return ResponseEntity.ok(resourceData);
     }
 
     // Get a specific resource by ID
@@ -53,8 +64,16 @@ public class ResourceController {
         if (resourceOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        
-        return ResponseEntity.ok(resourceOpt.get());
+        Resource resource = resourceOpt.get();
+        Map<String, Object> map = new java.util.HashMap<>();
+        map.put("id", resource.getId());
+        map.put("fileName", resource.getFileName());
+        map.put("fileId", extractFileIdFromNhostUrl(resource.getFileUrl()));
+        map.put("fileType", resource.getFileType());
+        map.put("fileSize", resource.getFileSize());
+        map.put("createdAt", resource.getCreatedAt());
+        map.put("updatedAt", resource.getUpdatedAt());
+        return ResponseEntity.ok(map);
     }
 
     // Create a new resource for a course (teachers only)
@@ -192,5 +211,13 @@ public class ResourceController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch resources: " + e.getMessage()));
         }
+    }
+
+    // Helper method to extract fileId from Nhost URL
+    private String extractFileIdFromNhostUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        int idx = url.indexOf("/v1/files/");
+        if (idx == -1) return null;
+        return url.substring(idx + 10).split("[/?]")[0];
     }
 }

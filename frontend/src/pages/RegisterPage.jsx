@@ -215,11 +215,24 @@ const RegisterPage = () => {
                 login(data);
             const params = new URLSearchParams(location.search);
             const next = params.get('next');
+            
+            // Check if the next path is for course enrollment
+            if (next && next.includes('/courses/') && next.includes('/resources')) {
+              // Extract the course ID from the URL
+              const courseIdMatch = next.match(/\/courses\/(\d+)\/resources/);
+              if (courseIdMatch && courseIdMatch[1]) {
+                const courseId = courseIdMatch[1];
+                // Redirect to enrollment page instead
+                navigate(`/enroll/${courseId}`, { replace: true });
+                return;
+              }
+            }
+            
             if (next) {
                 navigate(next, { replace: true });
             } else {
                 navigate('/dashboard');
-                }
+            }
             }
         } catch (err) {
             // Handle different error response formats

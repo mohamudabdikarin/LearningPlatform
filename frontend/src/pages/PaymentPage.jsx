@@ -11,7 +11,7 @@ const PaymentPage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading, updateUser } = useAuth();
   const { darkMode } = useDarkMode();
   
   const [course, setCourse] = useState(null);
@@ -29,8 +29,14 @@ const PaymentPage = () => {
   });
   
   useEffect(() => {
-    // Redirect to login if not authenticated
-    if (!user) {
+    // Wait for auth loading to complete before checking authentication
+    if (authLoading) return;
+    
+    // Check if token exists in localStorage (even if potentially expired)
+    const token = localStorage.getItem('token');
+    
+    // Only redirect if there's no token at all
+    if (!token) {
       navigate('/register', { 
         state: { 
           from: `/payment/${courseId}`,
@@ -47,15 +53,52 @@ const PaymentPage = () => {
       try {
         const courseData = await apiFetch(`/courses/${courseId}`);
         setCourse(courseData);
+        
+        // If we get here and user is null but token exists, 
+        // it means token might be valid but context hasn't loaded user yet
+        if (!user && token) {
+          try {
+            const profile = await apiFetch('/users/me');
+            if (profile) {
+              // Update user in context if needed
+              if (typeof updateUser === 'function') {
+                updateUser(profile);
+              }
+            }
+          } catch (profileErr) {
+            console.error('Failed to fetch user profile:', profileErr);
+            // Only redirect on profile fetch failure
+            if (profileErr.status === 401) {
+              navigate('/login', { 
+                state: { 
+                  from: `/payment/${courseId}`,
+                  enrollmentPending: true,
+                  courseId: courseId
+                } 
+              });
+            }
+          }
+        }
       } catch (err) {
         setError(err.message || 'Failed to load course details');
+        
+        // If unauthorized, redirect to login
+        if (err.status === 401) {
+          navigate('/login', { 
+            state: { 
+              from: `/payment/${courseId}`,
+              enrollmentPending: true,
+              courseId: courseId
+            } 
+          });
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchCourse();
-  }, [courseId, user, navigate]);
+  }, [courseId, user, navigate, authLoading]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -111,7 +154,7 @@ const PaymentPage = () => {
     }
   };
   
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className={darkMode ? 'dark' : ''}>
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

@@ -1,5 +1,8 @@
 package com.mycourse.elearningplatform.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.mycourse.elearningplatform.dto.EnrollmentDTO;
 import com.mycourse.elearningplatform.model.Enrollment;
 import com.mycourse.elearningplatform.model.Course;
 import com.mycourse.elearningplatform.model.User;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/enrollments")
@@ -55,23 +59,32 @@ public class EnrollmentController {
 
     // List enrollments for current user
     @GetMapping("/me")
-    public List<Enrollment> myEnrollments(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public List<EnrollmentDTO> myEnrollments(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         User user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
-        return enrollmentRepository.findByUser(user);
+        List<Enrollment> enrollments = enrollmentRepository.findByUser(user);
+        return enrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
     }
     
     // List courses for current user
     @GetMapping("/my-courses")
-    public List<Enrollment> myCourses(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public List<EnrollmentDTO> myCourses(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         User user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
-        return enrollmentRepository.findByUser(user);
+        List<Enrollment> enrollments = enrollmentRepository.findByUser(user);
+        return enrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
     }
     
     // Student: Get detailed enrollments with progress
     @GetMapping("/student")
-    public List<Enrollment> getStudentEnrollments(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public List<EnrollmentDTO> getStudentEnrollments(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         User user = userRepository.findByEmail(principal.getUsername()).orElseThrow();
-        return enrollmentRepository.findByUser(user);
+        List<Enrollment> enrollments = enrollmentRepository.findByUser(user);
+        return enrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
     }
     
     // Check if user is enrolled in a course
@@ -86,19 +99,23 @@ public class EnrollmentController {
     // Teacher: List enrollments for a course
     @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/course/{courseId}")
-    public ResponseEntity<List<Enrollment>> enrollmentsByCourse(@PathVariable Long courseId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public ResponseEntity<List<EnrollmentDTO>> enrollmentsByCourse(@PathVariable Long courseId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         Course course = courseRepository.findById(courseId).orElseThrow();
         User authenticatedUser = userRepository.findByEmail(principal.getUsername()).orElse(null);
         if (authenticatedUser == null || !course.getInstructor().getId().equals(authenticatedUser.getId())) {
             return ResponseEntity.status(403).body(null);
         }
-        return ResponseEntity.ok(enrollmentRepository.findByCourse(course));
+        List<Enrollment> enrollments = enrollmentRepository.findByCourse(course);
+        List<EnrollmentDTO> enrollmentDTOs = enrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(enrollmentDTOs);
     }
 
     // Teacher: List all enrolled students for teacher's courses
     @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/teacher/enrolled-students")
-    public ResponseEntity<List<Enrollment>> getEnrolledStudentsForTeacher(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public ResponseEntity<List<EnrollmentDTO>> getEnrolledStudentsForTeacher(@AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         User teacher = userRepository.findByEmail(principal.getUsername()).orElseThrow();
         List<Course> teacherCourses = courseRepository.findByInstructor(teacher);
         List<Enrollment> allEnrollments = new java.util.ArrayList<>();
@@ -108,13 +125,17 @@ public class EnrollmentController {
             allEnrollments.addAll(courseEnrollments);
         }
         
-        return ResponseEntity.ok(allEnrollments);
+        List<EnrollmentDTO> enrollmentDTOs = allEnrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(enrollmentDTOs);
     }
 
     // Teacher: Get enrolled students for a specific course with detailed info
     @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/teacher/course/{courseId}/enrolled-students")
-    public ResponseEntity<List<Map<String, Object>>> getEnrolledStudentsForCourse(@PathVariable Long courseId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public ResponseEntity<List<EnrollmentDTO>> getEnrolledStudentsForCourse(@PathVariable Long courseId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         Course course = courseRepository.findById(courseId).orElseThrow();
         User teacher = userRepository.findByEmail(principal.getUsername()).orElseThrow();
         
@@ -123,33 +144,26 @@ public class EnrollmentController {
         }
         
         List<Enrollment> enrollments = enrollmentRepository.findByCourse(course);
-        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        List<EnrollmentDTO> enrollmentDTOs = enrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
         
-        for (Enrollment enrollment : enrollments) {
-            Map<String, Object> enrollmentData = new java.util.HashMap<>();
-            enrollmentData.put("id", enrollment.getId());
-            enrollmentData.put("student", enrollment.getUser());
-            enrollmentData.put("course", enrollment.getCourse());
-            enrollmentData.put("enrolledAt", enrollment.getEnrolledAt());
-            enrollmentData.put("progress", enrollment.getProgress());
-            enrollmentData.put("lastActivityDate", enrollment.getLastActivityDate());
-            enrollmentData.put("averageQuizScore", enrollment.getAverageQuizScore());
-            enrollmentData.put("paid", enrollment.isPaid());
-            result.add(enrollmentData);
-        }
-        
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(enrollmentDTOs);
     }
 
     // Teacher: List enrollments for a user (only their own)
     @PreAuthorize("hasRole('TEACHER')")
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<Enrollment>> enrollmentsByUser(@PathVariable Long userId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public ResponseEntity<List<EnrollmentDTO>> enrollmentsByUser(@PathVariable Long userId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         User authenticatedUser = userRepository.findByEmail(principal.getUsername()).orElse(null);
         if (authenticatedUser == null || !authenticatedUser.getId().equals(userId)) {
             return ResponseEntity.status(403).body(null);
         }
-        return ResponseEntity.ok(enrollmentRepository.findByUser(authenticatedUser));
+        List<Enrollment> enrollments = enrollmentRepository.findByUser(authenticatedUser);
+        List<EnrollmentDTO> enrollmentDTOs = enrollments.stream()
+                .map(EnrollmentDTO::new)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(enrollmentDTOs);
     }
 
     // Mark enrollment as paid (after payment)

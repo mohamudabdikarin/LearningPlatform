@@ -6,15 +6,17 @@ public class LessonDto {
     private String description;
     private String contentUrl;
     private String createdAt;
+    private String fileId;
 
     public LessonDto() {}
 
-    public LessonDto(Long id, String title, String description, String contentUrl, String createdAt) {
+    public LessonDto(Long id, String title, String description, String contentUrl, String createdAt, String fileId) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.contentUrl = contentUrl;
         this.createdAt = createdAt;
+        this.fileId = fileId;
     }
 
     // Getters and setters
@@ -28,4 +30,6 @@ public class LessonDto {
     public void setContentUrl(String contentUrl) { this.contentUrl = contentUrl; }
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+    public String getFileId() { return fileId; }
+    public void setFileId(String fileId) { this.fileId = fileId; }
 } 

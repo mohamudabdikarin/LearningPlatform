@@ -54,7 +54,15 @@ public class LessonService {
                 lesson.getTitle(),
                 lesson.getDescription(),
                 lesson.getContentUrl(),
-                lesson.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                lesson.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                extractFileIdFromNhostUrl(lesson.getContentUrl())
         );
+    }
+
+    private String extractFileIdFromNhostUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        int idx = url.indexOf("/v1/files/");
+        if (idx == -1) return null;
+        return url.substring(idx + 10).split("[/?]")[0];
     }
 } 

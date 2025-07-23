@@ -4,13 +4,23 @@ import { useAuth } from '../context/AuthContext';
 import { useDarkMode } from '../context/DarkModeContext';
 import { Upload, File, Video, Image, FileText, Music, Trash2, Download, Eye, Plus, FolderOpen } from 'lucide-react';
 
+// Helper function to get proxy URL for files (replaces useSignedUrl hook)
+const getProxyUrl = (fileId) => {
+  if (!fileId) return null;
+  return `http://localhost:8080/api/proxy/file/${fileId}`;
+};
+
 const TeacherResourceUploadPage = () => {
   const { user } = useAuth();
   const { darkMode } = useDarkMode();
   const [courses, setCourses] = useState([]);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [uploading, setUploading] = useState(false);
-    const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentUploadFile, setCurrentUploadFile] = useState('');
+  const [currentFileSize, setCurrentFileSize] = useState(0);
+  const [uploadedBytes, setUploadedBytes] = useState(0);
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -93,6 +103,62 @@ const TeacherResourceUploadPage = () => {
     }
   };
 
+  // Upload single file with real progress tracking
+  const uploadFileWithProgress = (file, onProgress) => {
+    return new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = Math.round((e.loaded / e.total) * 100);
+          onProgress(percentComplete, e.loaded, e.total);
+        }
+      });
+
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch (e) {
+            reject(new Error('Invalid response format'));
+          }
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.addEventListener('timeout', () => {
+        reject(new Error('Upload timeout'));
+      });
+
+      // Open the request first
+      xhr.open('POST', `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/upload`);
+      
+      // Set timeout
+      xhr.timeout = 120000; // 2 minutes
+
+      // Set headers after opening
+      const token = localStorage.getItem('token');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      // Start upload
+      xhr.send(formData);
+    });
+  };
+
   // Handle multiple files upload (used by both drag-drop and file input)
   const handleFilesUpload = async (files) => {
     if (!files.length || !selectedCourseId) {
@@ -108,26 +174,38 @@ const TeacherResourceUploadPage = () => {
     }
 
     setUploading(true);
-        setError('');
+    setUploadProgress(0);
+    setCurrentUploadFile('');
+    setCurrentFileSize(0);
+    setUploadedBytes(0);
+    setError('');
     setSuccess('');
 
     try {
       let successCount = 0;
       let failCount = 0;
       const failedFiles = [];
+      const totalFiles = files.length;
 
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setCurrentUploadFile(file.name);
+        setCurrentFileSize(file.size);
+
         try {
-          console.log(`Uploading file: ${file.name}`);
+          console.log(`Uploading file ${i + 1}/${totalFiles}: ${file.name}`);
 
-          const formData = new FormData();
-          formData.append('file', file);
-
-          // Upload file
-          const uploadResponse = await apiFetch('/upload', {
-            method: 'POST',
-            body: formData,
-            headers: {}, // Let browser set Content-Type for FormData
+          // Upload file with real progress tracking
+          const uploadResponse = await uploadFileWithProgress(file, (fileProgress, loaded, total) => {
+            // Calculate overall progress more accurately
+            // Each file contributes equally to the total progress
+            const progressPerFile = 100 / totalFiles;
+            const completedFilesProgress = i * progressPerFile;
+            const currentFileProgress = (fileProgress / 100) * progressPerFile;
+            const overallProgress = Math.round(completedFilesProgress + currentFileProgress);
+            
+            setUploadProgress(Math.min(overallProgress, 100));
+            setUploadedBytes(loaded);
           });
 
           console.log('Upload response:', uploadResponse);
@@ -163,6 +241,9 @@ const TeacherResourceUploadPage = () => {
         }
       }
 
+      setUploadProgress(100);
+      setCurrentUploadFile('');
+
       if (successCount > 0) {
         setSuccess(`Successfully uploaded ${successCount} file(s)${failCount > 0 ? `. Failed: ${failedFiles.join(', ')}` : '!'}`);
         await fetchResources(selectedCourseId);
@@ -174,6 +255,10 @@ const TeacherResourceUploadPage = () => {
       setError(e.message || 'Failed to upload resources.');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
+      setCurrentUploadFile('');
+      setCurrentFileSize(0);
+      setUploadedBytes(0);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -298,15 +383,48 @@ const TeacherResourceUploadPage = () => {
                                     type="button"
                                     onClick={() => !uploading && fileInputRef.current?.click()}
                                     disabled={uploading}
-                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-colors text-base  sm:w-auto"
+                                    className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-colors text-base sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {uploading ? 'Uploading...' : 'Add'}
+                                    {uploading ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                            <span>Uploading...</span>
+                                        </div>
+                                    ) : 'Add'}
                                 </button>
                             </>
                         )}
                     </div>
                 </div>
             </div>
+
+            {/* Upload Progress */}
+            {uploading && (
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Uploading Files</h3>
+                        <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-4">
+                        <div 
+                            className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-3 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                    </div>
+                    {currentUploadFile && (
+                        <div className="space-y-2">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Currently uploading: <span className="font-medium text-gray-900 dark:text-white">{currentUploadFile}</span>
+                            </p>
+                            {currentFileSize > 0 && (
+                                <p className="text-xs text-gray-500 dark:text-gray-500">
+                                    {formatFileSize(uploadedBytes)} of {formatFileSize(currentFileSize)}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Resources List FIRST */}
             {selectedCourseId && (
@@ -330,8 +448,10 @@ const TeacherResourceUploadPage = () => {
                         </div>
                     ) : (
                         <div className="grid gap-4">
-                            {resources.map(resource => (
-                                <div key={resource.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors gap-3">
+                            {resources.map((resource) => {
+  const proxyUrl = getProxyUrl(resource.fileId);
+  return (
+    <div key={resource.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors gap-3">
                                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 flex-1 min-w-0">
                                         <div className="flex-shrink-0 flex items-center justify-center mb-2 sm:mb-0">
                                             {getFileTypeIcon(resource.fileName, resource.fileType)}
@@ -346,23 +466,23 @@ const TeacherResourceUploadPage = () => {
                                         </div>
                                     </div>
                                     <div className="flex flex-row sm:flex-col gap-2 sm:gap-2 items-center sm:items-end mt-2 sm:mt-0">
-                                        {resource.fileUrl && (resource.fileType?.match(/mp4|mov|avi|webm|video/i) || resource.fileName?.match(/\.(mp4|mov|avi|webm)$/i)) ? (
+                                        {proxyUrl && (resource.fileType?.match(/mp4|mov|avi|webm|video/i) || resource.fileName?.match(/\.(mp4|mov|avi|webm)$/i)) ? (
                                             <button
                                                 className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
                                                 title="View Video"
-                                                onClick={() => setVideoModalUrl(resource.fileUrl)}
+                                                onClick={() => setVideoModalUrl(proxyUrl)}
                                             >
                                                 <Eye className="w-5 h-5" />
                                             </button>
-                                        ) : resource.fileUrl && (
+                                        ) : proxyUrl ? (
                                             <button
                                                 className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"
                                                 title="View File"
-                                                onClick={() => setFileModal({ url: resource.fileUrl, type: resource.fileType || resource.fileName, name: resource.fileName })}
+                                                onClick={() => setFileModal({ url: proxyUrl, type: resource.fileType || resource.fileName, name: resource.fileName })}
                                             >
                                                 <Eye className="w-5 h-5" />
                                             </button>
-                                        )}
+                                        ) : null}
                                         <button
                                             onClick={() => handleDelete(resource.id)}
                                             disabled={deleteLoading === resource.id}
@@ -377,7 +497,8 @@ const TeacherResourceUploadPage = () => {
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                        })}
                         </div>
                     )}
                     {success && <div className="mt-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg w-full text-center">{success}</div>}

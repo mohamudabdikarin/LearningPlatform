@@ -18,12 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import java.util.Map;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import org.springframework.web.client.RestTemplate;
+import java.util.HashMap;
 import com.mycourse.elearningplatform.model.CourseRating;
 import com.mycourse.elearningplatform.repository.CourseRatingRepository;
 import java.math.BigDecimal;
@@ -32,97 +27,104 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/courses")
 public class CourseController {
-    @Autowired
-    private CourseService courseService;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private ResourceRepository resourceRepository;
-    @Value("${supabase.url}")
-    private String supabaseUrl;
-    @Value("${supabase.service.key}")
-    private String supabaseServiceKey;
-    @Autowired
-    private RestTemplate restTemplate;
-    @Autowired
-    private CourseRatingRepository courseRatingRepository;
 
-    // Public: List all courses
+    // Dependency injection for services and repositories
+    @Autowired private CourseService courseService;
+    @Autowired private UserRepository userRepository;
+    @Autowired private ResourceRepository resourceRepository;
+    @Autowired private com.mycourse.elearningplatform.service.NhostStorageService nhostStorageService;
+    @Autowired private CourseRatingRepository courseRatingRepository;
+
+    // --- GET ALL COURSES ---
     @GetMapping
     public ResponseEntity<?> getAllCourses() {
         var courses = courseService.getAllCourses();
-        var courseData = courses.stream().map(course -> Map.of(
-            "id", course.getId(),
-            "title", course.getTitle(),
-            "description", course.getDescription(),
-            "price", course.getPrice(),
-            "imageUrl", course.getImageUrl(),
-            "videoUrl", course.getVideoUrl(),
-            "discountPrice", course.getDiscountPrice(),
-            "discountActive", course.isDiscountActive(),
-            "duration", course.getDuration(),
-            "instructor", Map.of(
-                "id", course.getInstructor().getId(),
-                "firstName", course.getInstructor().getFirstName(),
-                "lastName", course.getInstructor().getLastName(),
-                "email", course.getInstructor().getEmail()
-            )
-        )).toList();
+
+        // Map each course to a simplified structure for the response
+        var courseData = courses.stream().map(course -> {
+            Map<String, Object> courseMap = new HashMap<>();
+            courseMap.put("id", course.getId());
+            courseMap.put("title", course.getTitle() != null ? course.getTitle() : "");
+            courseMap.put("description", course.getDescription() != null ? course.getDescription() : "");
+            courseMap.put("price", course.getPrice() != null ? course.getPrice() : 0);
+            courseMap.put("imageFileId", extractFileIdFromNhostUrl(course.getImageUrl()));
+            courseMap.put("videoFileId", extractFileIdFromNhostUrl(course.getVideoUrl()));
+            courseMap.put("discountPrice", course.getDiscountPrice());
+            courseMap.put("discountActive", course.isDiscountActive());
+            courseMap.put("duration", course.getDuration() != null ? course.getDuration() : "");
+
+            // Handle instructor safely
+            if (course.getInstructor() != null) {
+                Map<String, Object> instructorMap = new HashMap<>();
+                instructorMap.put("id", course.getInstructor().getId());
+                instructorMap.put("firstName", course.getInstructor().getFirstName());
+                instructorMap.put("lastName", course.getInstructor().getLastName());
+                instructorMap.put("email", course.getInstructor().getEmail());
+                courseMap.put("instructor", instructorMap);
+            } else {
+                courseMap.put("instructor", null);
+            }
+
+            return courseMap;
+        }).toList();
+
         return ResponseEntity.ok(courseData);
     }
 
-    // Public: Get course by ID
+    // --- GET COURSE BY ID ---
     @GetMapping("/{id}")
     public ResponseEntity<?> getCourse(@PathVariable Long id) {
         return courseService.getCourseById(id)
                 .map(course -> {
-                    Map<String, Object> courseData = Map.of(
-                        "id", course.getId(),
-                        "title", course.getTitle(),
-                        "description", course.getDescription(),
-                        "price", course.getPrice(),
-                        "imageUrl", course.getImageUrl(),
-                        "videoUrl", course.getVideoUrl(),
-                        "discountPrice", course.getDiscountPrice(),
-                        "discountActive", course.isDiscountActive(),
-                        "duration", course.getDuration(),
-                        "instructor", Map.of(
-                            "id", course.getInstructor().getId(),
-                            "firstName", course.getInstructor().getFirstName(),
-                            "lastName", course.getInstructor().getLastName(),
-                            "email", course.getInstructor().getEmail()
-                        )
-                    );
+                    Map<String, Object> courseData = new HashMap<>();
+                    courseData.put("id", course.getId());
+                    courseData.put("title", course.getTitle());
+                    courseData.put("description", course.getDescription());
+                    courseData.put("price", course.getPrice());
+                    courseData.put("imageFileId", extractFileIdFromNhostUrl(course.getImageUrl()));
+                    courseData.put("videoFileId", extractFileIdFromNhostUrl(course.getVideoUrl()));
+                    courseData.put("discountPrice", course.getDiscountPrice());
+                    courseData.put("discountActive", course.isDiscountActive());
+                    courseData.put("duration", course.getDuration());
+
+                    if (course.getInstructor() != null) {
+                        Map<String, Object> instructorData = new HashMap<>();
+                        instructorData.put("id", course.getInstructor().getId());
+                        instructorData.put("firstName", course.getInstructor().getFirstName());
+                        instructorData.put("lastName", course.getInstructor().getLastName());
+                        instructorData.put("email", course.getInstructor().getEmail());
+                        courseData.put("instructor", instructorData);
+                    } else {
+                        courseData.put("instructor", null);
+                    }
                     return ResponseEntity.ok(courseData);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Public: Search courses
+    // --- SEARCH COURSES ---
     @GetMapping("/search")
     public List<Course> searchCourses(@RequestParam String q) {
         return courseService.searchCourses(q);
     }
 
-    // Public: List courses by instructor
+    // --- GET COURSES BY INSTRUCTOR ---
     @GetMapping("/instructor/{instructorId}")
     public List<Course> getCoursesByInstructor(@PathVariable Long instructorId) {
         return courseService.getCoursesByInstructor(instructorId);
     }
 
-    // Teacher: Create course
-    @PreAuthorize("hasRole('TEACHER')") // Changed from hasAuthority
+    // --- CREATE COURSE ---
+    @PreAuthorize("hasRole('TEACHER')")
     @PostMapping
     public ResponseEntity<Course> createCourse(@RequestBody Course course, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
-        // Set instructor as current user
         User instructor = userRepository.findByEmail(principal.getUsername()).orElseThrow();
-        course.setInstructor(instructor);
-        // videoUrl is now accepted from the request body
+        course.setInstructor(instructor); // set the logged-in user as instructor
         return ResponseEntity.ok(courseService.createCourse(course));
     }
 
-    // Teacher: Update course
-    @PreAuthorize("hasRole('TEACHER')") // Changed from hasAuthority
+    // --- UPDATE COURSE ---
+    @PreAuthorize("hasRole('TEACHER')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateCourse(@PathVariable Long id, @RequestBody Course updated, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         try {
@@ -136,8 +138,8 @@ public class CourseController {
         }
     }
 
-    // Teacher: Delete course
-    @PreAuthorize("hasRole('TEACHER')") // Changed from hasAuthority
+    // --- DELETE COURSE ---
+    @PreAuthorize("hasRole('TEACHER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCourse(@PathVariable Long id, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         try {
@@ -151,114 +153,104 @@ public class CourseController {
         }
     }
 
-    // Teacher: Upload resource to course
-    @PreAuthorize("hasRole('TEACHER')") // Changed from hasAuthority
+    // --- Upload resource to course ---
+    @PreAuthorize("hasRole('TEACHER')")
     @PostMapping("/{courseId}/resources")
-    public ResponseEntity<?> uploadResourceToCourse(
-            @PathVariable Long courseId,
-            @RequestBody Map<String, String> body,
-            @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
+    public ResponseEntity<?> uploadResourceToCourse(@PathVariable Long courseId, @RequestBody Map<String, String> body, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         String filePath = body.get("filePath");
-        if (filePath == null || filePath.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Missing filePath"));
-        }
+        if (filePath == null || filePath.isBlank()) return ResponseEntity.badRequest().body(Map.of("error", "Missing filePath"));
+
         Course course = courseService.getCourseById(courseId).orElseThrow();
         User authenticatedUser = userRepository.findByEmail(principal.getUsername()).orElse(null);
-        if (authenticatedUser == null || !course.getInstructor().getId().equals(authenticatedUser.getId())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Access denied: You can only upload resources to your own courses"));
+
+        if (!course.getInstructor().getId().equals(authenticatedUser.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: Not your course"));
         }
+
         String fileType = filePath.contains(".") ? filePath.substring(filePath.lastIndexOf('.') + 1) : "unknown";
         String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+
         var resource = courseService.saveCourseResource(course, fileName, filePath, fileType);
         return ResponseEntity.ok(resource);
     }
 
-    // List resources for a course (students and teachers)
+    // --- List all resources for a course ---
     @GetMapping("/{courseId}/resources")
     public ResponseEntity<?> getResourcesForCourse(@PathVariable Long courseId) {
         Course course = courseService.getCourseById(courseId).orElseThrow();
         return ResponseEntity.ok(courseService.getResourcesByCourse(course));
     }
 
-    @PreAuthorize("hasRole('TEACHER')") // Changed from hasAuthority
+    // --- Delete a resource ---
+    @PreAuthorize("hasRole('TEACHER')")
     @DeleteMapping("/resources/{resourceId}")
     public ResponseEntity<?> deleteResource(@PathVariable Long resourceId, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         Resource resource = resourceRepository.findById(resourceId).orElse(null);
-        if (resource == null) {
-            return ResponseEntity.notFound().build();
-        }
+        if (resource == null) return ResponseEntity.notFound().build();
+
         User authenticatedUser = userRepository.findByEmail(principal.getUsername()).orElse(null);
-        if (authenticatedUser == null || !resource.getCourse().getInstructor().getId().equals(authenticatedUser.getId())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Access denied: You can only delete resources from your own courses"));
+        if (!resource.getCourse().getInstructor().getId().equals(authenticatedUser.getId())) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: Not your resource"));
         }
+
         courseService.deleteResourceById(resourceId);
         return ResponseEntity.ok().build();
     }
 
-    // Generate a signed URL for a Supabase media file (stub, to be implemented with Supabase admin SDK or via a serverless function)
+    // --- Get signed media URL from Nhost ---
     @GetMapping("/media/signed-url")
-    public ResponseEntity<?> getSignedUrl(@RequestParam String path) {
-        // Call Supabase Storage API to generate signed URL
-        String apiUrl = supabaseUrl + "/storage/v1/object/sign/media/" + path;
-        Map<String, Object> body = Map.of("expiresIn", 3600); // 1 hour
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.set("apikey", supabaseServiceKey);
-        headers.set("Authorization", "Bearer " + supabaseServiceKey);
-        headers.set("Content-Type", "application/json");
-        org.springframework.http.HttpEntity<Map<String, Object>> entity = new org.springframework.http.HttpEntity<>(body, headers);
+    public ResponseEntity<?> getSignedUrl(@RequestParam String fileId, @RequestParam(defaultValue = "3600") int expiresIn) {
         try {
-            org.springframework.http.ResponseEntity<Map> response = restTemplate.postForEntity(apiUrl, entity, Map.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null && response.getBody().get("signedURL") != null) {
-                return ResponseEntity.ok(Map.of("signedUrl", response.getBody().get("signedURL")));
-            } else {
-                return ResponseEntity.status(500).body(Map.of("error", "Failed to get signed URL from Supabase"));
-            }
+            Map<String, String> result = nhostStorageService.getSignedUrl(fileId, expiresIn);
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", "Supabase error: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to get signed URL: " + e.getMessage()));
         }
     }
 
-    // Teacher: Set or update course discount
+    // --- Set discount for course ---
     @PreAuthorize("hasRole('TEACHER')")
     @PutMapping("/{id}/discount")
     public ResponseEntity<?> setDiscount(@PathVariable Long id, @RequestBody Map<String, Object> body, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         Course course = courseService.getCourseById(id).orElseThrow();
         User instructor = userRepository.findByEmail(principal.getUsername()).orElseThrow();
-        if (!course.getInstructor().getId().equals(instructor.getId())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Access denied: You can only update your own courses"));
-        }
+        if (!course.getInstructor().getId().equals(instructor.getId())) return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+
         BigDecimal discountPrice = body.get("discountPrice") != null ? new BigDecimal(body.get("discountPrice").toString()) : null;
         boolean discountActive = Boolean.TRUE.equals(body.get("discountActive"));
+
         course.setDiscountPrice(discountPrice);
         course.setDiscountActive(discountActive && discountPrice != null && discountPrice.compareTo(BigDecimal.ZERO) > 0);
+
         courseService.createCourse(course);
         return ResponseEntity.ok(course);
     }
 
-    // Teacher: Remove course discount
+    // --- Remove discount ---
     @PreAuthorize("hasRole('TEACHER')")
     @DeleteMapping("/{id}/discount")
     public ResponseEntity<?> removeDiscount(@PathVariable Long id, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         Course course = courseService.getCourseById(id).orElseThrow();
         User instructor = userRepository.findByEmail(principal.getUsername()).orElseThrow();
-        if (!course.getInstructor().getId().equals(instructor.getId())) {
-            return ResponseEntity.status(403).body(Map.of("error", "Access denied: You can only update your own courses"));
-        }
+        if (!course.getInstructor().getId().equals(instructor.getId())) return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+
         course.setDiscountPrice(null);
         course.setDiscountActive(false);
         courseService.createCourse(course);
         return ResponseEntity.ok(course);
     }
 
-    // Student: Rate a course
+    // --- Rate course ---
     @PreAuthorize("hasRole('STUDENT')")
     @PostMapping("/{id}/rate")
     public ResponseEntity<?> rateCourse(@PathVariable Long id, @RequestBody Map<String, Object> body, @AuthenticationPrincipal com.mycourse.elearningplatform.security.UserDetailsImpl principal) {
         Course course = courseService.getCourseById(id).orElseThrow();
         User student = userRepository.findByEmail(principal.getUsername()).orElseThrow();
+
         int rating = (int) body.getOrDefault("rating", 0);
         String comment = (String) body.getOrDefault("comment", "");
         if (rating < 1 || rating > 5) return ResponseEntity.badRequest().body(Map.of("error", "Rating must be 1-5"));
+
         Optional<CourseRating> existing = courseRatingRepository.findByCourseAndUser(course, student);
         CourseRating cr = existing.orElseGet(() -> {
             CourseRating r = new CourseRating();
@@ -266,6 +258,7 @@ public class CourseController {
             r.setUser(student);
             return r;
         });
+
         cr.setRating(rating);
         cr.setComment(comment);
         cr.setCreatedAt(java.time.LocalDateTime.now());
@@ -273,37 +266,57 @@ public class CourseController {
         return ResponseEntity.ok(cr);
     }
 
-    // Public: Get all ratings for a course
+    // --- Get course ratings ---
     @GetMapping("/{id}/ratings")
     public ResponseEntity<?> getCourseRatings(@PathVariable Long id) {
         Course course = courseService.getCourseById(id).orElseThrow();
         var ratings = courseRatingRepository.findByCourse(course);
+
         var ratingData = ratings.stream().map(rating -> Map.of(
-            "id", rating.getId(),
-            "rating", rating.getRating(),
-            "comment", rating.getComment() != null ? rating.getComment() : "",
-            "createdAt", rating.getCreatedAt(),
-            "user", Map.of(
-                "id", rating.getUser().getId(),
-                "firstName", rating.getUser().getFirstName(),
-                "lastName", rating.getUser().getLastName()
-            )
+                "id", rating.getId(),
+                "rating", rating.getRating(),
+                "comment", rating.getComment(),
+                "createdAt", rating.getCreatedAt(),
+                "user", Map.of(
+                        "id", rating.getUser().getId(),
+                        "firstName", rating.getUser().getFirstName(),
+                        "lastName", rating.getUser().getLastName()
+                )
         )).toList();
+
         return ResponseEntity.ok(ratingData);
     }
 
-    // Public: Get course rating summary (average, count, enrollment count)
+    // --- Rating summary ---
     @GetMapping("/{id}/rating-summary")
     public ResponseEntity<?> getCourseRatingSummary(@PathVariable Long id) {
         Course course = courseService.getCourseById(id).orElseThrow();
         var ratings = courseRatingRepository.findByCourse(course);
         double avg = ratings.stream().mapToInt(CourseRating::getRating).average().orElse(0.0);
         int count = ratings.size();
-        long enrolled = course.getId() != null ? course.getEnrollments() != null ? course.getEnrollments().size() : 0 : 0;
-        return ResponseEntity.ok(Map.of(
-            "average", avg,
-            "count", count,
-            "enrolled", enrolled
-        ));
+        long enrolled = course.getEnrollments() != null ? course.getEnrollments().size() : 0;
+        return ResponseEntity.ok(Map.of("average", avg, "count", count, "enrolled", enrolled));
     }
-} 
+
+    // --- Helper: Get working image URL ---
+    private String getWorkingImageUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) return "";
+        if (imageUrl.startsWith("/uploads/")) return "http://localhost:8080" + imageUrl;
+        if (imageUrl.contains(".nhost.run") && imageUrl.contains("/v1/files/")) {
+            String[] parts = imageUrl.split("/v1/files/");
+            if (parts.length > 1) {
+                String fileId = parts[1].split("\\?")[0];
+                return "http://localhost:8080/api/proxy/image/" + fileId;
+            }
+        }
+        return imageUrl;
+    }
+
+    // --- Helper: Extract fileId from Nhost file URL ---
+    private String extractFileIdFromNhostUrl(String url) {
+        if (url == null || url.isEmpty()) return null;
+        int idx = url.indexOf("/v1/files/");
+        if (idx == -1) return null;
+        return url.substring(idx + 10).split("[/?]")[0];
+    }
+}
