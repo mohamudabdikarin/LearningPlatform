@@ -1,8 +1,9 @@
 # Importing JDK and copying required files
-FROM openjdk:19-jdk AS build
+FROM eclipse-temurin:17-jdk
 WORKDIR /app
-COPY pom.xml .
-COPY src src
+COPY target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","app.jar"]
 
 # Copy Maven wrapper
 COPY mvnw .
