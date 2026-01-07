@@ -15,29 +15,96 @@ const HomePage = () => {
     const [statsError, setStatsError] = useState('');
 
     useEffect(() => {
-        setLoading(true);
-        setError('');
-        apiFetch('/courses')
-            .then((coursesData) => {
-                setCourses(coursesData);
-                setLoading(false);
-            })
-            .catch((e) => {
-                setError(e.message || 'An unknown error occurred while loading courses.');
-                setLoading(false);
-            });
-        setStatsLoading(true);
-        setStatsError('');
-        apiFetch('/users/stats')
-            .then(data => {
-                setStats(data);
-                setStatsLoading(false);
-            })
-            .catch((e) => {
-                setStatsLoading(false);
-                setStatsError(e.message || 'An unknown error occurred while loading stats.');
-                setStats({ courses: 0, students: 0, teachers: 0, lessons: 0 });
-            });
+        // Mock data for demo
+        const mockCourses = [
+            {
+                id: 1,
+                title: "Complete React Development Bootcamp",
+                description: "Master React from basics to advanced concepts including hooks, context, and state management",
+                price: 199.99,
+                discountPrice: 149.99,
+                discountActive: true,
+                duration: 40,
+                level: "Beginner",
+                imageFileId: "1",
+                instructor: { firstName: "Sarah", lastName: "Johnson" }
+            },
+            {
+                id: 2,
+                title: "Data Science with Python",
+                description: "Comprehensive course covering data analysis, visualization, and machine learning with Python",
+                price: 249.99,
+                discountPrice: null,
+                discountActive: false,
+                duration: 50,
+                level: "Intermediate",
+                imageFileId: "2",
+                instructor: { firstName: "Michael", lastName: "Chen" }
+            },
+            {
+                id: 3,
+                title: "UI/UX Design Fundamentals",
+                description: "Learn the principles of user interface and user experience design with hands-on projects",
+                price: 179.99,
+                discountPrice: 129.99,
+                discountActive: true,
+                duration: 30,
+                level: "Beginner",
+                imageFileId: "3",
+                instructor: { firstName: "Emily", lastName: "Rodriguez" }
+            },
+            {
+                id: 4,
+                title: "Mobile App Development with React Native",
+                description: "Build cross-platform mobile apps using React Native and JavaScript",
+                price: 229.99,
+                discountPrice: 179.99,
+                discountActive: true,
+                duration: 45,
+                level: "Intermediate",
+                imageFileId: "4",
+                instructor: { firstName: "David", lastName: "Thompson" }
+            },
+            {
+                id: 5,
+                title: "DevOps and Cloud Computing",
+                description: "Master DevOps practices and cloud deployment with AWS, Docker, and Kubernetes",
+                price: 299.99,
+                discountPrice: null,
+                discountActive: false,
+                duration: 60,
+                level: "Advanced",
+                imageFileId: "5",
+                instructor: { firstName: "Lisa", lastName: "Wang" }
+            },
+            {
+                id: 6,
+                title: "JavaScript Fundamentals",
+                description: "Complete guide to JavaScript programming from basics to advanced concepts",
+                price: 149.99,
+                discountPrice: 99.99,
+                discountActive: true,
+                duration: 35,
+                level: "Beginner",
+                imageFileId: "6",
+                instructor: { firstName: "Sarah", lastName: "Johnson" }
+            }
+        ];
+
+        const mockStats = {
+            courses: 12,
+            students: 1247,
+            teachers: 6,
+            lessons: 156
+        };
+
+        // Simulate loading delay
+        setTimeout(() => {
+            setCourses(mockCourses);
+            setLoading(false);
+            setStats(mockStats);
+            setStatsLoading(false);
+        }, 800);
     }, []);
 
     if (loading) return (

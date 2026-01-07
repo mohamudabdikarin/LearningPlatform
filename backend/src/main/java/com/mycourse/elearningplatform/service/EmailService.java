@@ -10,17 +10,26 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${spring.mail.username:demo@example.com}")
     private String fromEmail;
 
-    @Value("${app.frontend-url}")
+    @Value("${app.frontend-url:http://localhost:5174}")
     private String frontendUrl;
+
+    @Value("${demo.email.enabled:false}")
+    private boolean emailEnabled;
 
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
     public void sendPasswordResetEmail(String toEmail, String resetToken, String firstName) {
+        if (!emailEnabled) {
+            System.out.println("📧 DEMO MODE: Password reset email would be sent to: " + toEmail);
+            System.out.println("🔗 Reset link: " + frontendUrl + "/reset-password?token=" + resetToken);
+            return;
+        }
+
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(toEmail);
@@ -45,6 +54,12 @@ public class EmailService {
     }
 
     public void sendEmailVerification(String toEmail, String verificationToken, String firstName) {
+        if (!emailEnabled) {
+            System.out.println("📧 DEMO MODE: Email verification would be sent to: " + toEmail);
+            System.out.println("🔗 Verification link: " + frontendUrl + "/verify-email?token=" + verificationToken);
+            return;
+        }
+
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(toEmail);
@@ -69,6 +84,12 @@ public class EmailService {
     }
 
     public void sendResendVerificationEmail(String toEmail, String verificationToken, String firstName) {
+        if (!emailEnabled) {
+            System.out.println("📧 DEMO MODE: Resend verification email would be sent to: " + toEmail);
+            System.out.println("🔗 Verification link: " + frontendUrl + "/verify-email?token=" + verificationToken);
+            return;
+        }
+
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(fromEmail);
         message.setTo(toEmail);
@@ -93,20 +114,37 @@ public class EmailService {
     }
 
     public void sendVerificationCode(String toEmail, String code, String firstName) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(fromEmail);
-        message.setTo(toEmail);
-        message.setSubject("Your Verification Code - E-Learning Platform");
-        String emailContent = String.format(
-            "Hello %s,\n\n" +
-            "Your verification code for E-Learning Platform is: %s\n\n" +
-            "This code will expire in 10 minutes.\n\n" +
-            "If you did not create an account, please ignore this email.\n\n" +
-            "Best regards,\n" +
-            "E-Learning Platform Team",
-            firstName, code
-        );
-        message.setText(emailContent);
-        mailSender.send(message);
+        if (!emailEnabled) {
+            System.out.println("📧 DEMO MODE: Verification code would be sent to: " + toEmail);
+            System.out.println("🔢 Verification code: " + code);
+            return;
+        }
+
+        try {
+            System.out.println("Attempting to send verification code to: " + toEmail);
+            
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(toEmail);
+            message.setSubject("Your Verification Code - E-Learning Platform");
+            String emailContent = String.format(
+                "Hello %s,\n\n" +
+                "Your verification code for E-Learning Platform is: %s\n\n" +
+                "This code will expire in 10 minutes.\n\n" +
+                "If you did not create an account, please ignore this email.\n\n" +
+                "Best regards,\n" +
+                "E-Learning Platform Team",
+                firstName, code
+            );
+            message.setText(emailContent);
+            
+            mailSender.send(message);
+            System.out.println("Verification code sent successfully to: " + toEmail);
+            
+        } catch (Exception e) {
+            System.err.println("Failed to send verification code to " + toEmail + ": " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to send verification email: " + e.getMessage(), e);
+        }
     }
-} 
+}

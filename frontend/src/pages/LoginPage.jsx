@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 // To use react-icons, you would typically run: npm install react-icons
 // We are importing icons from Feather and Ionicons 5 for a clean, modern look.
-import { FiSun, FiMoon, FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiSun, FiMoon, FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiBookOpen } from 'react-icons/fi';
 import { IoSchoolOutline } from "react-icons/io5";
 import DarkModeToggle from '../components/DarkModeToggle';
 import { useDarkMode } from '../context/DarkModeContext';
@@ -45,6 +45,19 @@ const LoginPage = () => {
     if (errors[name]) {
       setErrors({ ...errors, [name]: '' });
     }
+  };
+
+  // Demo account functions
+  const fillDemoAdmin = () => {
+    setForm({ email: 'admin@demo.com', password: 'demo123' });
+    setErrors({});
+    setApiError('');
+  };
+
+  const fillDemoStudent = () => {
+    setForm({ email: 'student@demo.com', password: 'demo123' });
+    setErrors({});
+    setApiError('');
   };
 
   const validateForm = () => {
@@ -153,24 +166,69 @@ const LoginPage = () => {
       
 
         {/* Reduced max-width to prevent the form from looking oversized */}
-        <main className="w-full max-w-md md:max-w-2xl lg:max-w-3xl xl:max-w-4xl grid grid-cols-1 lg:grid-cols-2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
+        <main className="w-full max-w-md md:max-w-2xl lg:max-w-5xl xl:max-w-6xl grid grid-cols-1 lg:grid-cols-2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
 
-          {/* Left Side: Decorative Panel */}
-          <div className="hidden lg:flex flex-col items-center justify-center p-12 bg-indigo-600 text-white text-center">
-            <IoSchoolOutline size={70} className="mb-6 opacity-80" />
-            <h1 className="text-2xl font-bold leading-tight mb-3">
-              Your Learning Journey
-            </h1>
-            <p className="text-indigo-100 opacity-90 max-w-sm text-base">
-              Sign in to access courses, track progress, and join our community.
-            </p>
+          {/* Left Side: Hero Image */}
+          <div className="hidden lg:block relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 opacity-90"></div>
+            <img 
+              src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1471&q=80" 
+              alt="Students learning together" 
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-white text-center">
+              <IoSchoolOutline size={80} className="mb-6 opacity-90" />
+              <h1 className="text-3xl font-bold leading-tight mb-4">
+                Welcome to Learnify
+              </h1>
+              <p className="text-white/90 max-w-sm text-lg leading-relaxed">
+                Your gateway to knowledge and skill development. Join thousands of learners worldwide.
+              </p>
+              <div className="mt-8 flex items-center space-x-6 text-white/80">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">10K+</div>
+                  <div className="text-sm">Students</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">500+</div>
+                  <div className="text-sm">Courses</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">50+</div>
+                  <div className="text-sm">Instructors</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right Side: Login Form */}
-          <div className="p-8 flex flex-col justify-center">
-            <div className="w-full max-w-xs mx-auto">
-              <h2 className="text-2xl font-bold text-center mb-1 text-gray-900 dark:text-white">Sign In</h2>
-              <p className="text-center text-gray-600 dark:text-gray-400 mb-6">Enter your credentials to continue.</p>
+          <div className="p-8 lg:p-12 flex flex-col justify-center">
+            <div className="w-full max-w-sm mx-auto">
+              <h2 className="text-3xl font-bold text-center mb-2 text-gray-900 dark:text-white">Sign In</h2>
+              <p className="text-center text-gray-600 dark:text-gray-400 mb-8">Enter your credentials to continue learning.</p>
+
+              {/* Demo Account Buttons */}
+              <div className="mb-6 space-y-3">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Try Demo Accounts:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={fillDemoAdmin}
+                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                  >
+                    <FiUser className="w-4 h-4 mr-2" />
+                    Admin Demo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fillDemoStudent}
+                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                  >
+                    <FiBookOpen className="w-4 h-4 mr-2" />
+                    Student Demo
+                  </button>
+                </div>
+              </div>
 
               {apiError && (
                 <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg relative mb-5 text-sm" role="alert">

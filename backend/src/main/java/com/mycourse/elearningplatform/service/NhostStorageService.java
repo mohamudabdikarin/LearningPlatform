@@ -14,13 +14,13 @@ import java.util.UUID;
 @Service
 public class NhostStorageService {
 
-    @Value("${nhost.subdomain}")
+    @Value("${nhost.subdomain:demo}")
     private String nhostSubdomain;
 
-    @Value("${nhost.region}")
+    @Value("${nhost.region:demo}")
     private String nhostRegion;
 
-    @Value("${nhost.admin.secret}")
+    @Value("${nhost.admin.secret:demo}")
     private String nhostAdminSecret;
 
     private final RestTemplate restTemplate;

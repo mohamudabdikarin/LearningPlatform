@@ -252,6 +252,22 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Verification code resent."));
     }
 
+    // ------------------------ TEST EMAIL ------------------------
+    @PostMapping("/test-email")
+    public ResponseEntity<?> testEmail(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        }
+        
+        try {
+            emailService.sendVerificationCode(email, "123456", "Test User");
+            return ResponseEntity.ok(Map.of("message", "Test email sent successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to send email: " + e.getMessage()));
+        }
+    }
+
     // ------------------------ RESEND VERIFICATION LINK ------------------------
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification(@Valid @RequestBody EmailVerificationRequest request) {

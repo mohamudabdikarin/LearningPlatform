@@ -12,37 +12,43 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.IOException;
+import java.net.URL;
+
 /**
- * Proxy controller to serve Nhost images through our backend to avoid CORS issues
+ * Proxy controller to serve images through our backend to avoid CORS issues
+ * In demo mode, serves placeholder images from Picsum
  */
 @RestController
 @RequestMapping("/api/proxy")
 public class ProxyController {
 
-    @Value("${nhost.subdomain}")
+    @Value("${nhost.subdomain:demo}")
     private String nhostSubdomain;
 
-    @Value("${nhost.region}")
+    @Value("${nhost.region:demo}")
     private String nhostRegion;
 
-    @Value("${nhost.adminsecret.}")
+    @Value("${nhost.admin.secret:demo}")
     private String nhostAdminSecret;
+
+    @Value("${demo.mode:true}")
+    private boolean demoMode;
 
     @Autowired
     private RestTemplate restTemplate;
 
     /**
-     * Proxy endpoint for Nhost images
-     * @param fileId The Nhost file ID
+     * Proxy endpoint for images
+     * @param fileId The file ID
      * @return The image content
-     */
-    /**
-     * Proxy endpoint for Nhost files (images, videos, etc.)
-     * @param fileId The Nhost file ID
-     * @return The file content
      */
     @GetMapping("/image/{fileId}")
     public ResponseEntity<byte[]> proxyImage(@PathVariable String fileId) {
+        if (demoMode) {
+            return proxyDemoImage(fileId);
+        }
+        
         try {
             // Construct the Nhost URL
             String nhostUrl = String.format("https://%s.storage.%s.nhost.run/v1/files/%s", 
@@ -121,7 +127,58 @@ public class ProxyController {
     }
     
     /**
-     * Generic proxy endpoint for any Nhost file
+     * Demo mode image proxy - serves placeholder images from Picsum
+     */
+    private ResponseEntity<byte[]> proxyDemoImage(String fileId) {
+        try {
+            // Generate consistent placeholder image based on fileId
+            int imageId = Math.abs(fileId.hashCode() % 1000);
+            String picsumUrl = "https://picsum.photos/400/300?random=" + imageId;
+            
+            System.out.println("📸 DEMO MODE: Proxying placeholder image: " + picsumUrl);
+            
+            // Get the image from Picsum
+            ResponseEntity<byte[]> response = restTemplate.getForEntity(picsumUrl, byte[].class);
+            
+            // Create headers with appropriate content type
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.IMAGE_JPEG); // Picsum returns JPEG
+            headers.setCacheControl("public, max-age=3600"); // Cache for 1 hour
+            
+            return new ResponseEntity<>(response.getBody(), headers, HttpStatus.OK);
+        } catch (Exception e) {
+            System.err.println("Error proxying demo image " + fileId + ": " + e.getMessage());
+            
+            // Return a simple 1x1 pixel image as ultimate fallback
+            byte[] fallbackImage = createFallbackImage();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.IMAGE_PNG);
+            headers.setCacheControl("public, max-age=3600");
+            
+            return new ResponseEntity<>(fallbackImage, headers, HttpStatus.OK);
+        }
+    }
+    
+    /**
+     * Creates a simple 1x1 pixel PNG image as fallback
+     */
+    private byte[] createFallbackImage() {
+        // Simple 1x1 transparent PNG (89 bytes)
+        return new byte[] {
+            (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, (byte)0xC4,
+            (byte)0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54,
+            0x78, (byte)0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05,
+            0x00, 0x01, 0x0D, 0x0A, 0x2D, (byte)0xB4, 0x00, 0x00,
+            0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, (byte)0xAE, 0x42,
+            0x60, (byte)0x82
+        };
+    }
+    
+    /**
+     * Generic proxy endpoint for any file
      */
     @GetMapping("/file/{fileId}")
     public ResponseEntity<byte[]> proxyFile(@PathVariable String fileId) {

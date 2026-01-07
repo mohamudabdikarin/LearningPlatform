@@ -15,31 +15,35 @@ const CourseCard = ({ course, onEdit, onDelete }) => {
         ? `${course.instructor.firstName} ${course.instructor.lastName}` 
         : course.instructorName || "Instructor";
 
-    // Real rating and enrolled count
+    // Mock rating and enrolled count for demo
     const [ratingSummary, setRatingSummary] = useState({ average: 0, count: 0, enrolled: 0 });
     useEffect(() => {
-        // ... existing code ...
+        // Mock rating data based on course ID
+        const mockRatings = [
+            { average: 4.8, count: 127, enrolled: 156 },
+            { average: 4.6, count: 89, enrolled: 134 },
+            { average: 4.9, count: 203, enrolled: 245 },
+            { average: 4.7, count: 156, enrolled: 189 },
+            { average: 4.5, count: 78, enrolled: 98 },
+            { average: 4.8, count: 145, enrolled: 167 }
+        ];
+        
+        const mockData = mockRatings[(course.id - 1) % mockRatings.length] || mockRatings[0];
+        setRatingSummary(mockData);
     }, [course.id]);
 
-    // Public image URL state - use proxy to avoid CORS issues
+    // Mock image URL for demo
     const [publicImageUrl, setPublicImageUrl] = useState(null);
     useEffect(() => {
-        let fileId = null;
+        // Use mock images for demo
         if (course.imageFileId) {
-            fileId = course.imageFileId;
-        } else if (course.imageUrl && course.imageUrl.includes('nhost.run')) {
-            const match = course.imageUrl.match(/\/v1\/files\/([^/?]+)/);
-            if (match && match[1]) {
-                fileId = match[1];
-            }
-        }
-        if (fileId) {
-            // Use backend proxy to avoid CORS issues
-            setPublicImageUrl(`${BACKEND_URL}/api/proxy/image/${fileId}`);
+            setPublicImageUrl(`https://picsum.photos/400/300?random=${course.imageFileId}`);
+        } else if (course.imageUrl) {
+            setPublicImageUrl(course.imageUrl);
         } else {
-            setPublicImageUrl(null);
+            setPublicImageUrl(`https://picsum.photos/400/300?random=${course.id}`);
         }
-    }, [course.imageFileId, course.imageUrl]);
+    }, [course.imageFileId, course.imageUrl, course.id]);
 
     // Helper: is student
     const isStudent = user && user.roles && user.roles.includes('STUDENT');
