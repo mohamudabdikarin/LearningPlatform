@@ -1,5 +1,46 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
+// Check if we're in demo mode (when backend is not available)
+const isDemoMode = () => {
+  return API_BASE_URL.includes('elearning-backend.vercel.app') || 
+         API_BASE_URL.includes('your-backend-url.com');
+};
+
+// Demo mode fallback for when backend is not available
+const handleDemoAuth = async (endpoint, options) => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  if (endpoint === '/auth/login') {
+    const body = JSON.parse(options.body || '{}');
+    
+    // Demo credentials
+    if (body.email === 'demo@example.com' && body.password === 'demo123') {
+      const demoUser = {
+        token: 'demo-jwt-token-' + Date.now(),
+        id: 1,
+        email: 'demo@example.com',
+        firstName: 'Demo',
+        roles: ['STUDENT']
+      };
+      
+      return demoUser;
+    } else {
+      throw new ApiError('Invalid demo credentials. Use: demo@example.com / demo123', 401);
+    }
+  }
+  
+  if (endpoint === '/auth/register') {
+    // Simulate successful registration
+    return {
+      message: 'Demo registration successful! You can now login with demo@example.com / demo123',
+      requiresVerification: false
+    };
+  }
+  
+  throw new ApiError('Demo mode: This feature is not available in demo mode', 501);
+};
+
 // Enhanced token validation
 const isProbablyValidToken = (token) => {
   if (!token || typeof token !== 'string') return false;
@@ -144,6 +185,11 @@ export const apiFetch = async (endpoint, options = {}) => {
     ...fetchOptions 
   } = options;
 
+  // Demo mode fallback for auth endpoints
+  if (isDemoMode() && endpoint.startsWith('/auth/')) {
+    return handleDemoAuth(endpoint, fetchOptions);
+  }
+
   const makeRequest = async () => {
     // Prepare headers
     const headers = { ...fetchOptions.headers };
@@ -185,6 +231,16 @@ export const apiFetch = async (endpoint, options = {}) => {
     return await withTimeout(requestPromise, timeout);
   } catch (error) {
     console.error(`API request failed for ${endpoint}:`, error);
+    
+    // If backend is not available, show helpful error
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      throw new ApiError(
+        'Backend service is currently unavailable. Please try again later or contact support.',
+        503,
+        { isNetworkError: true }
+      );
+    }
+    
     throw error;
   }
 };

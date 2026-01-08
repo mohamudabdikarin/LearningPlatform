@@ -49,13 +49,13 @@ const LoginPage = () => {
 
   // Demo account functions
   const fillDemoAdmin = () => {
-    setForm({ email: 'admin@demo.com', password: 'demo123' });
+    setForm({ email: 'demo@example.com', password: 'demo123' });
     setErrors({});
     setApiError('');
   };
 
   const fillDemoStudent = () => {
-    setForm({ email: 'student@demo.com', password: 'demo123' });
+    setForm({ email: 'demo@example.com', password: 'demo123' });
     setErrors({});
     setApiError('');
   };
@@ -209,23 +209,20 @@ const LoginPage = () => {
 
               {/* Demo Account Buttons */}
               <div className="mb-6 space-y-3">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Try Demo Accounts:</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300 text-center mb-2">
+                    🚀 Demo Mode Active
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 text-center mb-3">
+                    Backend is in demo mode. Use the demo account below:
+                  </p>
                   <button
                     type="button"
                     onClick={fillDemoAdmin}
-                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                    className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
                   >
                     <FiUser className="w-4 h-4 mr-2" />
-                    Admin Demo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={fillDemoStudent}
-                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
-                  >
-                    <FiBookOpen className="w-4 h-4 mr-2" />
-                    Student Demo
+                    Use Demo Account (demo@example.com)
                   </button>
                 </div>
               </div>
