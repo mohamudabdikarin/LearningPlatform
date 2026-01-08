@@ -257,6 +257,27 @@ export const getEnrolledStudentsForCourse = async (courseId) => {
   });
 };
 
+// Test backend connection
+export const testBackendConnection = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/test/health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Backend connection test failed:', error);
+    throw error;
+  }
+};
+
 // Enhanced API service with better method signatures
 const apiService = {
   get: async (url, params = {}, options = {}) => {

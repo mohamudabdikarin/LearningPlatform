@@ -8,7 +8,7 @@ import { useDarkMode } from '../context/DarkModeContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { apiFetch } from '../services/apiService';
+import { apiFetch, testBackendConnection } from '../services/apiService';
 
 // A simple email validation function
 const validateEmail = (email) => {
@@ -38,6 +38,22 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('checking'); // checking, online, offline
+
+  // Test backend connection on component mount
+  React.useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        await testBackendConnection();
+        setBackendStatus('online');
+      } catch (error) {
+        setBackendStatus('offline');
+        setApiError('Backend service is currently unavailable. Please try again later.');
+      }
+    };
+    
+    checkBackend();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

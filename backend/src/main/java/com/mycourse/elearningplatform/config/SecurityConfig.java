@@ -56,6 +56,7 @@ public class SecurityConfig {
                         .requestMatchers("/").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/test/**").permitAll() // Test endpoints
                         .requestMatchers(HttpMethod.GET, "/api/courses/**").permitAll() // Only GET requests are public
                         .requestMatchers(HttpMethod.GET, "/api/users/stats").permitAll()
                         
@@ -92,18 +93,14 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Use pattern matching for more flexible origin handling
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "https://*.vercel.app",
-            "https://learning-platform-gs2e88xv2-mohamuds-projects-59b102b1.vercel.app"
-        ));
+        // Allow all origins for now to debug
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        configuration.setMaxAge(3600L); // Cache preflight for 1 hour
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
