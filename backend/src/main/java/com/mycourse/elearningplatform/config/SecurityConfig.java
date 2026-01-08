@@ -2,7 +2,6 @@ package com.mycourse.elearningplatform.config;
 
 import com.mycourse.elearningplatform.security.jwt.JwtAuthFilter;
 import com.mycourse.elearningplatform.security.UserDetailsServiceImpl;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,7 +19,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
-import java.util.List;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
@@ -30,9 +28,6 @@ public class SecurityConfig {
 
     private final UserDetailsServiceImpl userDetailsService;
     private final JwtAuthFilter jwtAuthFilter;
-
-    @Value("${spring.web.cors.allowed-origins}")
-    private String allowedOrigins;
 
     public SecurityConfig(UserDetailsServiceImpl userDetailsService, JwtAuthFilter jwtAuthFilter) {
         this.userDetailsService = userDetailsService;
@@ -97,9 +92,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Use origins from application.properties
-        List<String> origins = Arrays.asList(allowedOrigins.split(","));
-        configuration.setAllowedOrigins(origins);
+        // Use pattern matching for more flexible origin handling
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*",
+            "https://*.vercel.app"
+        ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
