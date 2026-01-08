@@ -49,13 +49,13 @@ const LoginPage = () => {
 
   // Demo account functions
   const fillDemoAdmin = () => {
-    setForm({ email: 'demo@example.com', password: 'demo123' });
+    setForm({ email: 'teacher@demo.com', password: 'password123' });
     setErrors({});
     setApiError('');
   };
 
   const fillDemoStudent = () => {
-    setForm({ email: 'demo@example.com', password: 'demo123' });
+    setForm({ email: 'student@demo.com', password: 'password123' });
     setErrors({});
     setApiError('');
   };
@@ -209,20 +209,23 @@ const LoginPage = () => {
 
               {/* Demo Account Buttons */}
               <div className="mb-6 space-y-3">
-                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
-                  <p className="text-sm font-medium text-blue-800 dark:text-blue-300 text-center mb-2">
-                    🚀 Demo Mode Active
-                  </p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 text-center mb-3">
-                    Backend is in demo mode. Use the demo account below:
-                  </p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Quick Login Options:</p>
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={fillDemoAdmin}
-                    className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
                   >
                     <FiUser className="w-4 h-4 mr-2" />
-                    Use Demo Account (demo@example.com)
+                    Teacher Demo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fillDemoStudent}
+                    className="flex items-center justify-center px-3 py-2 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                  >
+                    <FiBookOpen className="w-4 h-4 mr-2" />
+                    Student Demo
                   </button>
                 </div>
               </div>

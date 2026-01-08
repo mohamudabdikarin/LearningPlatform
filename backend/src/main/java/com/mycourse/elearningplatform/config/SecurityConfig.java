@@ -95,7 +95,8 @@ public class SecurityConfig {
         // Use pattern matching for more flexible origin handling
         configuration.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:*",
-            "https://*.vercel.app"
+            "https://*.vercel.app",
+            "https://learning-platform-gs2e88xv2-mohamuds-projects-59b102b1.vercel.app"
         ));
         
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
