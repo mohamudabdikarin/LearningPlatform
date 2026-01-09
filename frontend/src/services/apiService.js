@@ -138,7 +138,7 @@ const withRetry = async (fn, maxRetries = 3, delay = 1000) => {
 
 export const apiFetch = async (endpoint, options = {}) => {
   const { 
-    timeout = 30000, 
+    timeout = 60000, // Increased default timeout for Render cold starts
     retry = false, 
     retryAttempts = 3,
     ...fetchOptions 
@@ -192,6 +192,15 @@ export const apiFetch = async (endpoint, options = {}) => {
         'Backend service is currently unavailable. Please try again later or contact support.',
         503,
         { isNetworkError: true }
+      );
+    }
+    
+    // Handle timeout errors specifically for Render cold starts
+    if (error.message.includes('timeout')) {
+      throw new ApiError(
+        'Request timed out. The server may be starting up (this can take up to 60 seconds on free hosting). Please try again.',
+        408,
+        { isTimeout: true }
       );
     }
     
@@ -275,6 +284,30 @@ export const testBackendConnection = async () => {
   } catch (error) {
     console.error('Backend connection test failed:', error);
     throw error;
+  }
+};
+
+// Wake up the backend (for Render cold starts)
+export const wakeUpBackend = async () => {
+  try {
+    console.log('Waking up backend...');
+    const response = await fetch(`${API_BASE_URL}/test/health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Longer timeout for cold start
+      signal: AbortSignal.timeout(90000)
+    });
+    
+    if (response.ok) {
+      console.log('Backend is awake');
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Failed to wake up backend:', error);
+    return false;
   }
 };
 

@@ -8,7 +8,7 @@ import { useDarkMode } from '../context/DarkModeContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
-import { apiFetch, testBackendConnection } from '../services/apiService';
+import { apiFetch, testBackendConnection, wakeUpBackend } from '../services/apiService';
 
 // A simple email validation function
 const validateEmail = (email) => {
@@ -107,10 +107,24 @@ const LoginPage = () => {
       setErrors({}); // Clear previous field errors
       
       try {
+        // If backend is offline, try to wake it up first
+        if (backendStatus === 'offline') {
+          setApiError('Waking up the server... This may take up to 60 seconds.');
+          const isAwake = await wakeUpBackend();
+          if (isAwake) {
+            setBackendStatus('online');
+            setApiError('');
+          } else {
+            setApiError('Server is taking longer than expected to start. Please try again in a moment.');
+            return;
+          }
+        }
+        
         const data = await apiFetch('/auth/login', {
           method: 'POST',
           body: JSON.stringify(form),
           headers: { 'Content-Type': 'application/json' },
+          timeout: 90000 // Extended timeout for potential cold starts
         });
         
         // Store the login data first
@@ -159,7 +173,12 @@ const LoginPage = () => {
             }
           }
         } else {
-          setApiError(err.message);
+          // Handle timeout errors with helpful message
+          if (err.status === 408 || err.message.includes('timeout')) {
+            setApiError('Login request timed out. The server may be starting up (free hosting can take 30-60 seconds). Please try again.');
+          } else {
+            setApiError(err.message);
+          }
         }
       } finally {
         setLoading(false);
@@ -222,6 +241,31 @@ const LoginPage = () => {
             <div className="w-full max-w-sm mx-auto">
               <h2 className="text-3xl font-bold text-center mb-2 text-gray-900 dark:text-white">Sign In</h2>
               <p className="text-center text-gray-600 dark:text-gray-400 mb-8">Enter your credentials to continue learning.</p>
+
+              {/* Backend Status Indicator */}
+              {backendStatus === 'checking' && (
+                <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-300 text-center">
+                    🔄 Checking server status...
+                  </p>
+                </div>
+              )}
+              
+              {backendStatus === 'offline' && (
+                <div className="mb-4 bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-700 rounded-lg p-3">
+                  <p className="text-sm text-orange-800 dark:text-orange-300 text-center">
+                    ⚠️ Server is sleeping (free hosting). Login will wake it up (may take 30-60 seconds).
+                  </p>
+                </div>
+              )}
+              
+              {backendStatus === 'online' && (
+                <div className="mb-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3">
+                  <p className="text-sm text-green-800 dark:text-green-300 text-center">
+                    ✅ Server is online and ready
+                  </p>
+                </div>
+              )}
 
               {/* Demo Account Buttons */}
               <div className="mb-6 space-y-3">
